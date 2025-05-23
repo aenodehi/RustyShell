@@ -19,6 +19,12 @@ fn main() {
             process::exit(0);
         }
 
+        if command.starts_with("echo ") {
+            let echo_output = &command[5..];
+            println!("{}", echo_output);
+            continue;
+        }
+
         println!("{}: command not found", command);
     }
 }
