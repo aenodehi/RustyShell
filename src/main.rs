@@ -36,7 +36,7 @@ fn main() {
                     println!("{} is a shell builtin", arg);
                 }
                 _ => {
-                    println!("type {}: command not found", arg);
+                    println!("{}: not found", arg);
                 }
             }
             continue;
