@@ -1,4 +1,3 @@
-#[allow(unused_imports)]
 use std::io::{self, Write};
 use std::process;
 
@@ -25,6 +24,12 @@ fn main() {
             continue;
         }
 
+        if command == "type echo" {
+            println!("echo is a shell builtin");
+            continue;
+        }
+
         println!("{}: command not found", command);
     }
 }
+
