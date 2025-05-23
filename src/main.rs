@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
 use std::io::{self, Write};
+use std::process;
 
 fn main() {
     loop {
@@ -13,6 +14,10 @@ fn main() {
         }
 
         let command = input.trim();
+
+        if command == "exit 0" {
+            process::exit(0);
+        }
 
         println!("{}: command not found", command);
     }
