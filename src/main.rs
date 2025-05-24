@@ -43,7 +43,7 @@ fn main() {
         // Builtin: type 
         if command == "type" {
             if let Some(arg) = args.first() {
-                if *arg == "echo" || *arg == "exit" || *arg == "type" {
+                if *arg == "echo" || *arg == "exit" || *arg == "type" || *arg == "pwd" {
                     println!("{} is a shell builtin", arg);
                     continue;
                 }
