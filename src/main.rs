@@ -100,7 +100,7 @@ fn main() {
         if command == "cd" {
             if let Some(path) = args.first() {
 
-                let target_dir = if path == "~" {
+                let target_dir = if *path == "~" {
                     std::env::var("HOME").unwrap_or_else(|_| {
                         eprintln!("cd: HOME not set");
                         ".".to_string()
