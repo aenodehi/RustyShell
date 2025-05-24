@@ -1,6 +1,7 @@
 use std::io::{self, Write};
 use std::process::{self, Command};
 use std::path::Path;
+use std::os::unix::fs::PermissionsExt
 
 fn main() {
     loop {
@@ -50,7 +51,7 @@ fn main() {
                     let mut found = false;
                     for dir in path_var.split(':') {
                         let full_path = Path::new(dir).join(arg);
-                        if full_path.exists() && full_path.display() {
+                        if full_path.exists() && full_path.is_file() {
                             println!("{} is {}", arg, full_path.display());
                             found = true;
                             break;
@@ -70,13 +71,20 @@ fn main() {
 
         // Try to run external program
         if let Ok(path_var) = std::env::var("PATH") {
+            let mut found = false;
             for dir in path_var.split(':') {
                 let full_path = Path::new(dir).join(command);
-                if full_path.exists() && full_path.is_file() && full_path.metadata().map(|m| m.permissions().mode() & 0o111 != 0).unwrap_or(false) {
+                if full_path.exists() 
+                    && full_path.is_file() 
+                    && full_path
+                    .metadata()
+                    .map(|m| m.permissions().mode() & 0o111 != 0)
+                    .unwrap_or(false) 
+                {
                     let result = Command::new(full_path)
                         .args(args)
                         .spawn()
-                        .and_then(|mut child| child.wait_wait_output());
+                        .and_then(|mut child| child.wait_with_output());
 
                     match result {
                         Ok(output) => {
@@ -87,13 +95,16 @@ fn main() {
                             eprintln!("Failed to execute {}: {}", command, e);
                         }
                     }
-                    return;
+
+                    found = true;
+                    break;
                 }
             }
-        }
 
-        // Fallback
-        println!("{}: command not found", command);
+            if !found {
+                println!("{}: command not found", command);
+            }
+        }
     }
 }
 
