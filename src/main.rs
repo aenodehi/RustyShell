@@ -181,17 +181,17 @@ fn tokenize(input: &str) -> Vec<String> {
                 if in_single_quotes {
                     current.push('\\');
                 } else if let Some(&next_ch) = chars.peek() {
-                    // Inside double quotes, only some escapes are special
+                    let next_ch = chars.next().unwrap();
                     if in_double_quotes && (next_ch == '"' || next_ch == '\\' || next_ch == '$' || next_ch == '\n') {
                         if next_ch != '\n' {
-                            current.push(chars.next().unwrap());
-                        } else {
-                            chars.next(); // skip escaped newline
+                            current.push(next_ch);
                         }
                     } else {
-                        // Outside quotes or in double quotes with normal char
-                        current.push(chars.next().unwrap());
+                        current.push('\\');
+                        current.push(next_ch);
                     }
+                } else {
+                    current.push('\\');
                 }
             }
 
