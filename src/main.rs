@@ -166,39 +166,42 @@ fn tokenize(input: &str) -> Vec<String> {
 
     while let Some(ch) = chars.next() {
         match ch {
+            // Toggle single quote context
             '\'' if !in_double_quotes => {
                 in_single_quotes = !in_single_quotes;
             }
 
+            // Toggle double quote context
             '"' if !in_single_quotes => {
                 in_double_quotes = !in_double_quotes;
             }
 
-            '\\' if in_double_quotes => {
-                match chars.peek() {
-                    Some('"') | Some('\\') | Some('$') => {
-                        current.push(chars.next().unwrap()); // push the escaped char
-                    }
-                    Some('\n') => {
-                        chars.next(); // skip escaped newline
-                    }
-                    Some(other) => {
-                        current.push('\\');
-                        current.push(*other);
-                        chars.next();
-                    }
-                    None => {
-                        current.push('\\');
+            // Handle backslash
+            '\\' => {
+                if in_single_quotes {
+                    current.push('\\');
+                } else if let Some(&next_ch) = chars.peek() {
+                    // Inside double quotes, only some escapes are special
+                    if in_double_quotes && (next_ch == '"' || next_ch == '\\' || next_ch == '$' || next_ch == '\n') {
+                        if next_ch != '\n' {
+                            current.push(chars.next().unwrap());
+                        } else {
+                            chars.next(); // skip escaped newline
+                        }
+                    } else {
+                        // Outside quotes or in double quotes with normal char
+                        current.push(chars.next().unwrap());
                     }
                 }
             }
 
+            // Whitespace (token boundary) outside any quotes
             ' ' | '\t' if !in_single_quotes && !in_double_quotes => {
                 if !current.is_empty() {
                     tokens.push(current.clone());
                     current.clear();
                 }
-                // skip additional whitespace
+                // Skip extra whitespace
                 while let Some(&next) = chars.peek() {
                     if next == ' ' || next == '\t' {
                         chars.next();
