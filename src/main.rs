@@ -180,7 +180,7 @@ fn tokenize(input: &str) -> Vec<String> {
             '\\' => {
                 if in_single_quotes {
                     current.push('\\');
-                } else if let Some(&next_ch) = chars.peek() {
+                } else if chars.peek().is_some() {
                     let next_ch = chars.next().unwrap();
                     if in_double_quotes {
                         if next_ch == '\\' || next_ch == '"' || next_ch == '$' || next_ch == '\n' {
