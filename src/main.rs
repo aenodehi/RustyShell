@@ -84,7 +84,7 @@ fn main() {
             if let Some(target_dir) = args.first() {
                 let path = Path::new(target_dir);
                 if path.is_absolute() {
-                    if let Err(e) = std::env::set_current_dir(path) {
+                    if let Err(_) = std::env::set_current_dir(path) {
                         eprintln!("cd: {}: No such file or directory", target_dir);
                     }
                 } else {
