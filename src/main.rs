@@ -182,12 +182,16 @@ fn tokenize(input: &str) -> Vec<String> {
                     current.push('\\');
                 } else if let Some(&next_ch) = chars.peek() {
                     let next_ch = chars.next().unwrap();
-                    if in_double_quotes && (next_ch == '"' || next_ch == '\\' || next_ch == '$' || next_ch == '\n') {
-                        if next_ch != '\n' {
+                    if in_double_quotes {
+                        if next_ch == '\\' || next_ch == '"' || next_ch == '$' || next_ch == '\n' {
+                            if next_ch != '\n' {
+                                current.push(next_ch);
+                            }
+                        } else {
+                            current.push('\\');
                             current.push(next_ch);
                         }
                     } else {
-                        current.push('\\');
                         current.push(next_ch);
                     }
                 } else {
