@@ -1,10 +1,9 @@
 use std::io::{self, Write};
-use std::process::{self, Command};
+use std::process::{self, Command, Stdio};
 use std::path::Path;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::process::CommandExt;
 use std::fs::File;
-use std::process::Stdio;
 
 fn main() {
     loop {
@@ -51,15 +50,15 @@ fn main() {
                 }
 
                 if let Ok(path_var) = std::env::var("PATH") {
-                    let mut found = false;
-                    for dir in path_var.split(':') {
+                    let found = path_var.split(':').any(|dir| {
                         let full_path = Path::new(dir).join(arg);
                         if full_path.exists() && full_path.is_file() {
                             println!("{} is {}", arg, full_path.display());
-                            found = true;
-                            break;
+                            true
+                        } else {
+                            false
                         }
-                    }
+                    });
 
                     if !found {
                         println!("{}: not found", arg);
@@ -82,23 +81,6 @@ fn main() {
         }
 
         // Builtin: cd
-//        if command == "cd" {
-//            if let Some(target_dir) = args.first() {
-//                let path = Path::new(target_dir);
-//                if path.is_absolute() {
-//                    if let Err(_) = std::env::set_current_dir(path) {
-//                        eprintln!("cd: {}: No such file or directory", target_dir);
-//                    }
-//                } else {
-//                    eprintln!("cd: {}: Relative paths not supported yet", target_dir);
-//                }
-//            } else {
-//                eprintln!("cd: missing operand")
-//            }
-//            continue;
-//        }
-
-        // Builtin: cd
         if command == "cd" {
             if let Some(path) = args.first() {
                 let target_dir = if *path == "~" {
@@ -119,18 +101,20 @@ fn main() {
             }
             continue;
         }
+
         // Try to run external program
         if let Ok(path_var) = std::env::var("PATH") {
             let mut found = false;
             for dir in path_var.split(':') {
                 let full_path = Path::new(dir).join(&command);
-                if full_path.exists() 
-                    && full_path.is_file() 
+                if full_path.exists()
+                    && full_path.is_file()
                     && full_path
-                    .metadata()
-                    .map(|m| m.permissions().mode() & 0o111 != 0)
-                    .unwrap_or(false) 
+                        .metadata()
+                        .map(|m| m.permissions().mode() & 0o111 != 0)
+                        .unwrap_or(false)
                 {
+                    found = true;
                     let mut args_vec = args.to_vec();
                     let mut stdout_redirect: Option<File> = None;
 
@@ -142,7 +126,7 @@ fn main() {
                                 match File::create(&filename) {
                                     Ok(file) => {
                                         stdout_redirect = Some(file);
-                                        args_vec.drain(i..=i+1);
+                                        args_vec.drain(i..=i + 1);
                                         continue;
                                     }
                                     Err(e) => {
@@ -157,11 +141,12 @@ fn main() {
                         }
                         i += 1;
                     }
+
                     let mut cmd = Command::new(full_path);
                     cmd.arg0(&command).args(&args_vec);
 
-                    if let Some(file) = stdout_redirect {
-                        cmd.stdout(Stdio::from(file));
+                    if let Some(ref file) = stdout_redirect {
+                        cmd.stdout(Stdio::from(file.try_clone().unwrap()));
                     } else {
                         cmd.stdout(Stdio::piped());
                     }
@@ -179,6 +164,7 @@ fn main() {
                             eprintln!("Failed to execute {}: {}", command, e);
                         }
                     }
+                    break;
                 }
             }
 
@@ -212,8 +198,7 @@ fn tokenize(input: &str) -> Vec<String> {
             '\\' => {
                 if in_single_quotes {
                     current.push('\\');
-                } else if chars.peek().is_some() {
-                    let next_ch = chars.next().unwrap();
+                } else if let Some(next_ch) = chars.next() {
                     if in_double_quotes {
                         if next_ch == '\\' || next_ch == '"' || next_ch == '$' || next_ch == '\n' {
                             if next_ch != '\n' {
@@ -237,7 +222,6 @@ fn tokenize(input: &str) -> Vec<String> {
                     tokens.push(current.clone());
                     current.clear();
                 }
-                // Skip extra whitespace
                 while let Some(&next) = chars.peek() {
                     if next == ' ' || next == '\t' {
                         chars.next();
