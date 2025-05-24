@@ -121,7 +121,7 @@ fn main() {
         if let Ok(path_var) = std::env::var("PATH") {
             let mut found = false;
             for dir in path_var.split(':') {
-                let full_path = Path::new(dir).join(command);
+                let full_path = Path::new(dir).join(&command);
                 if full_path.exists() 
                     && full_path.is_file() 
                     && full_path
@@ -131,7 +131,7 @@ fn main() {
                 {
                     let result = Command::new(full_path)
                         .arg0(&command)
-                        .args(args)
+                        .args(args.iter().map(|s| s.as_str()))
                         .spawn()
                         .and_then(|child| child.wait_with_output());
 
