@@ -22,7 +22,7 @@ fn main() {
             continue;
         }
 
-        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        let parts = tokenize(trimmed);
         if parts.is_empty() {
             continue;
         }
