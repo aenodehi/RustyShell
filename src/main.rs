@@ -22,11 +22,11 @@ fn main() {
             continue;
         }
 
-        let parts = tokenize(trimmed);
+        let parts: Vec<String> = tokenize(trimmed);
         if parts.is_empty() {
             continue;
         }
-        let command = parts[0];
+        let command = &parts[0];
         let args = &parts[1..];
 
         // Builtin: exit
