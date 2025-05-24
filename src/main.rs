@@ -157,7 +157,6 @@ fn main() {
     }
 }
 
-
 fn tokenize(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current = String::new();
@@ -166,24 +165,30 @@ fn tokenize(input: &str) -> Vec<String> {
 
     while let Some(&ch) = chars.peek() {
         match ch {
-            '\'' if !in_single_quotes => {
-                in_single_quotes = true;
-                chars.next(); // consume the opening quote
+            '\'' => {
+                chars.next(); // consume the quote
+
+                if in_single_quotes {
+                    in_single_quotes = false;
+                    // keep collecting if another quote follows
+                    if let Some('\'') = chars.peek() {
+                        in_single_quotes = true;
+                    } else {
+                        // done with quoted token, but don't push yet
+                        // wait for potential continuation
+                        continue;
+                    }
+                } else {
+                    in_single_quotes = true;
+                }
             }
-            '\'' if in_single_quotes => {
-                in_single_quotes = false;
-                chars.next(); // consume the closing quote
-                // end of quoted token; push it and reset current
-                tokens.push(current.clone());
-                current.clear();
-            }
+
             ' ' | '\t' if !in_single_quotes => {
                 if !current.is_empty() {
                     tokens.push(current.clone());
                     current.clear();
                 }
-                chars.next(); // consume whitespace
-                // skip consecutive whitespace outside quotes
+                chars.next();
                 while let Some(&c) = chars.peek() {
                     if c == ' ' || c == '\t' {
                         chars.next();
@@ -192,6 +197,7 @@ fn tokenize(input: &str) -> Vec<String> {
                     }
                 }
             }
+
             _ => {
                 current.push(ch);
                 chars.next();
@@ -199,11 +205,11 @@ fn tokenize(input: &str) -> Vec<String> {
         }
     }
 
-    // If still inside single quotes at end of input, treat it as a token anyway
     if !current.is_empty() {
         tokens.push(current);
     }
 
     tokens
 }
+
 
