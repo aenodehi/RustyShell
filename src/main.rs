@@ -85,7 +85,7 @@ fn main() {
                 let path = Path::new(target_dir);
                 if path.is_absolute() {
                     if let Err(e) = std::env::set_current_dir(path) {
-                        eprintln!("cd: {}: {}", target_dir, e.to_string());
+                        eprintln!("cd: {}: No such file or directory", target_dir);
                     }
                 } else {
                     eprintln!("cd: {}: Relative paths not supported yet", target_dir);
