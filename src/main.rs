@@ -100,15 +100,18 @@ fn main() {
         if command == "cd" {
             if let Some(path) = args.first() {
                 let target_dir = if *path == "~" {
-                    std::env::var("HOME").unwrap_or_else(|_| {
-                        eprintln!("cd: HOME not set");
-                        ".".to_string()
-                    })
+                    match std::env::var("HOME") {
+                        Ok(home) => home,
+                        Err(_) => {
+                            eprintln!("cd: HOME not set");
+                            continue;
+                        }
+                    }
                 } else {
                     path.to_string()
                 };
 
-                if let Err(_) = std::env::set_current_dir(target_dir) {
+                if let Err(_) = std::env::set_current_dir(&target_dir) {
                     eprintln!("cd: {}: No such file or directory", target_dir);
                 }
             }
