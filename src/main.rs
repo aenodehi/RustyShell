@@ -38,19 +38,42 @@ fn main() {
         // Builtin: echo
         if command == "echo" {
             let mut cleaned_args = Vec::new();
+            let mut stdout_redirect: Option<File> = None;
+
             let mut i = 0;
             while i < args.len() {
                 if args[i] == ">" || args[i] == "1>" {
-                    i += 2;
-                    continue;
+                    if i+1 < args.len() {
+                        match File::create(&args[i+1]) {
+                            Ok(file) => stdout_redirect = Some(file),
+                            Err(e) => {
+                                eprintln!("{}: {}", args[i+1], e);
+                                break;
+                            }
+                        }
+                        i += 2;
+                        continue;
+                    } else {
+                        eprintln!("{}: missing filename", args[i]);
+                        break;
+                    }
                 }
+                
                 cleaned_args.push(args[i].clone());
                 i += 1;
             }
 
-    println!("{}", cleaned_args.join(" "));
-    continue;
-}
+            let output = cleaned_args.join(" ");
+
+            if let Some(mut file) = stdout_redirect {
+                if let Err(e) = writeln!(file, "{}", output){
+                    eprintln!("echo: failed to write to file: {}", e);
+                }
+            } else {
+                println!("{}", output);
+            }
+            continue;
+        }
 
         // Builtin: type 
         if command == "type" {
