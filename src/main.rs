@@ -80,22 +80,31 @@ fn main() {
         }
 
         // Builtin: cd
+//        if command == "cd" {
+//            if let Some(target_dir) = args.first() {
+//                let path = Path::new(target_dir);
+//                if path.is_absolute() {
+//                    if let Err(_) = std::env::set_current_dir(path) {
+//                        eprintln!("cd: {}: No such file or directory", target_dir);
+//                    }
+//                } else {
+//                    eprintln!("cd: {}: Relative paths not supported yet", target_dir);
+//                }
+//            } else {
+//                eprintln!("cd: missing operand")
+//            }
+//            continue;
+//        }
+
+        // Builtin: cd
         if command == "cd" {
-            if let Some(target_dir) = args.first() {
-                let path = Path::new(target_dir);
-                if path.is_absolute() {
-                    if let Err(_) = std::env::set_current_dir(path) {
-                        eprintln!("cd: {}: No such file or directory", target_dir);
-                    }
-                } else {
-                    eprintln!("cd: {}: Relative paths not supported yet", target_dir);
+            if let Some(path) = args.first() {
+                if let Err(_) = std::env::set_current_dir(path) {
+                    eprintln!("cd: {}: No such file or directory", path);
                 }
-            } else {
-                eprintln!("cd: missing operand")
             }
             continue;
         }
-
         // Try to run external program
         if let Ok(path_var) = std::env::var("PATH") {
             let mut found = false;
