@@ -145,7 +145,7 @@ fn main() {
                                         args_vec.drain(i..=i+1);
                                         continue;
                                     }
-                                    Err => {
+                                    Err(e) => {
                                         eprintln!("{}: {}", filename, e);
                                         break;
                                     }
