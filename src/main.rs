@@ -70,6 +70,15 @@ fn main() {
             }
         }
 
+        // Builtin: pwd
+        if command == "pwd" {
+            match std::env::current_dir() {
+                Ok(path) => println!("{}", path.display()),
+                Err(err) => eprintln!("pwd: {}", err),
+            }
+            continue;
+        }
+
         // Try to run external program
         if let Ok(path_var) = std::env::var("PATH") {
             let mut found = false;
