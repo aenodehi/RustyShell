@@ -130,7 +130,7 @@ fn main() {
                     .unwrap_or(false) 
                 {
                     let result = Command::new(full_path)
-                        .arg0(command)
+                        .arg0(&command)
                         .args(args)
                         .spawn()
                         .and_then(|child| child.wait_with_output());
