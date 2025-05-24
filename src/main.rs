@@ -79,6 +79,23 @@ fn main() {
             continue;
         }
 
+        // Builtin: cd
+        if command == "cd" {
+            if let Some(target_dir) = args.first() {
+                let path = Path::new(target_dir);
+                if path.is_absolute() {
+                    if let Err(e) = std::env::set_current_dir(path) {
+                        eprintln!("cd: {}: {}", target_dir, e.to_string());
+                    }
+                } else {
+                    eprintln!("cd: {}: Relative paths not supported yet", target_dir);
+                }
+            } else {
+                eprintln!("cd: missing operand")
+            }
+            continue;
+        }
+
         // Try to run external program
         if let Ok(path_var) = std::env::var("PATH") {
             let mut found = false;
