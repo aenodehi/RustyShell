@@ -129,24 +129,54 @@ fn main() {
                     .map(|m| m.permissions().mode() & 0o111 != 0)
                     .unwrap_or(false) 
                 {
-                    let result = Command::new(full_path)
-                        .arg0(&command)
-                        .args(args.iter().map(|s| s.as_str()))
-                        .spawn()
-                        .and_then(|child| child.wait_with_output());
+                    let mut args_vec = args.to_vec();
+                    let mut stdout_redirect: Option<File> = None;
 
-                    match result {
+                    let mut i = 0;
+                    while i < args_vec.len() {
+                        if args_vec[i] == ">" || args_vec[i] == "1>" {
+                            if i + 1 < args_vec.len() {
+                                let filename = args_vec[i + 1].clone();
+                                match File::create(&filename) {
+                                    Ok(file) => {
+                                        stdout_redirect = Some(file);
+                                        args_vec.drain(i..=i+1);
+                                        continue;
+                                    }
+                                    Err => {
+                                        eprintln!("{}: {}", filename, e);
+                                        break;
+                                    }
+                                }
+                            } else {
+                                eprintln!("{}: missing filename", args_vec[i]);
+                                break;
+                            }
+                        }
+                        i += 1;
+                    }
+                    let mut cmd = Command::new(full_path);
+                    cmd.arg0(&command).args(&args_vec);
+
+                    if let Some(file) = stdout_redirect {
+                        cmd.stdout(Stdio::from(file));
+                    } else {
+                        cmd.stdout(Stdio::piped());
+                    }
+
+                    cmd.stderr(Stdio::piped());
+
+                    match cmd.spawn().and_then(|child| child.wait_with_output()) {
                         Ok(output) => {
-                            print!("{}", String::from_utf8_lossy(&output.stdout));
+                            if stdout_redirect.is_none() {
+                                print!("{}", String::from_utf8_lossy(&output.stdout));
+                            }
                             eprint!("{}", String::from_utf8_lossy(&output.stderr));
                         }
                         Err(e) => {
                             eprintln!("Failed to execute {}: {}", command, e);
                         }
                     }
-
-                    found = true;
-                    break;
                 }
             }
 
