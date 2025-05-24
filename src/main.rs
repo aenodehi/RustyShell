@@ -31,15 +31,22 @@ fn main() {
         // Handle "type <builtin>"
         if command.starts_with("type ") {
             let arg = &command[5..];
-            match arg {
-                "echo" | "exit" | "type" => {
-                    println!("{} is a shell builtin", arg);
-                }
-                _ => {
-                    println!("{}: not found", arg);
+            
+            if arg == "echo" || arg == "exit" || arg == "type" {
+                println!("{} is a shell builtin", arg);
+                continue;
+            }
+
+            if let Ok(path_var) = std::env::var("PATH") {
+                let paths = path_var.split(':');
+                for dir in paths {
+                    let full_path = std::path::Path:new(dir).join(arg);
+                    if full_path.exists() && full_path.is_file() {
+                        println!("{} is {}", arg, full_path.display());
+                        continue;
+                    }
                 }
             }
-            continue;
         }
 
         // Fallback: unknown command
