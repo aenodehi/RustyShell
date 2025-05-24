@@ -86,7 +86,7 @@ fn main() {
                         .arg0(command)
                         .args(args)
                         .spawn()
-                        .and_then(|mut child| child.wait_with_output());
+                        .and_then(|child| child.wait_with_output());
 
                     match result {
                         Ok(output) => {
