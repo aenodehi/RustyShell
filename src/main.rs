@@ -37,9 +37,20 @@ fn main() {
 
         // Builtin: echo
         if command == "echo" {
-            println!("{}", args.join(" "));
-            continue;
-        }
+            let mut cleaned_args = Vec::new();
+            let mut i = 0;
+            while i < args.len() {
+                if args[i] == ">" || args[i] == "1>" {
+                    i += 2;
+                    continue;
+                }
+                cleaned_args.push(args[i].clone());
+                i += 1;
+            }
+
+    println!("{}", cleaned_args.join(" "));
+    continue;
+}
 
         // Builtin: type 
         if command == "type" {
