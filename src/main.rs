@@ -162,35 +162,45 @@ fn tokenize(input: &str) -> Vec<String> {
     let mut current = String::new();
     let mut chars = input.chars().peekable();
     let mut in_single_quotes = false;
+    let mut in_double_quotes = false;
 
-    while let Some(&ch) = chars.peek() {
+    while let Some(ch) = chars.next() {
         match ch {
-            '\'' => {
-                chars.next(); // consume the quote
+            '\'' if !in_double_quotes => {
+                in_single_quotes = !in_single_quotes;
+            }
 
-                if in_single_quotes {
-                    in_single_quotes = false;
-                    // keep collecting if another quote follows
-                    if let Some('\'') = chars.peek() {
-                        in_single_quotes = true;
-                    } else {
-                        // done with quoted token, but don't push yet
-                        // wait for potential continuation
-                        continue;
+            '"' if !in_single_quotes => {
+                in_double_quotes = !in_double_quotes;
+            }
+
+            '\\' if in_double_quotes => {
+                match chars.peek() {
+                    Some('"') | Some('\\') | Some('$') => {
+                        current.push(chars.next().unwrap()); // push the escaped char
                     }
-                } else {
-                    in_single_quotes = true;
+                    Some('\n') => {
+                        chars.next(); // skip escaped newline
+                    }
+                    Some(other) => {
+                        current.push('\\');
+                        current.push(*other);
+                        chars.next();
+                    }
+                    None => {
+                        current.push('\\');
+                    }
                 }
             }
 
-            ' ' | '\t' if !in_single_quotes => {
+            ' ' | '\t' if !in_single_quotes && !in_double_quotes => {
                 if !current.is_empty() {
                     tokens.push(current.clone());
                     current.clear();
                 }
-                chars.next();
-                while let Some(&c) = chars.peek() {
-                    if c == ' ' || c == '\t' {
+                // skip additional whitespace
+                while let Some(&next) = chars.peek() {
+                    if next == ' ' || next == '\t' {
                         chars.next();
                     } else {
                         break;
@@ -200,7 +210,6 @@ fn tokenize(input: &str) -> Vec<String> {
 
             _ => {
                 current.push(ch);
-                chars.next();
             }
         }
     }
@@ -211,5 +220,4 @@ fn tokenize(input: &str) -> Vec<String> {
 
     tokens
 }
-
 
