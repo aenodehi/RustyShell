@@ -1,7 +1,7 @@
 use std::io::{self, Write};
 use std::process::{self, Command};
 use std::path::Path;
-use std::os::unix::fs::PermissionsExt
+use std::os::unix::fs::PermissionsExt;
 
 fn main() {
     loop {
