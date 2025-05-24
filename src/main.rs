@@ -2,6 +2,7 @@ use std::io::{self, Write};
 use std::process::{self, Command};
 use std::path::Path;
 use std::os::unix::fs::PermissionsExt;
+use std::os::unix::process::CommandExt;
 
 fn main() {
     loop {
@@ -82,6 +83,7 @@ fn main() {
                     .unwrap_or(false) 
                 {
                     let result = Command::new(full_path)
+                        .arg0(command_name)
                         .args(args)
                         .spawn()
                         .and_then(|mut child| child.wait_with_output());
