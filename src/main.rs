@@ -38,14 +38,21 @@ fn main() {
             }
 
             if let Ok(path_var) = std::env::var("PATH") {
+                let mut found = false;
                 let paths = path_var.split(':');
                 for dir in paths {
                     let full_path = std::path::Path::new(dir).join(arg);
                     if full_path.exists() && full_path.is_file() {
                         println!("{} is {}", arg, full_path.display());
-                        continue;
+                        found = true;
+                        break;
                     }
                 }
+
+                if !found {
+                    println!("{}: not found", arg);
+                }
+                continue;
             }
         }
 
