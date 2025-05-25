@@ -76,9 +76,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .completion_type(CompletionType::List)
         .build();
 
-    let mut rl = Editor::<_, FileHistory>::with_config(config).unwrap();    
-    let completer = ShellCompleter;
-    rl.set_helper(Some(completer));
+    //let mut rl = Editor::<_, FileHistory>::with_config(config).unwrap();    
+    //let completer = ShellCompleter;
+    //rl.set_helper(Some(completer));
+
+    let mut rl = Editor::<ShellCompleter>::new()?;
+    rl.set_completer(Some(ShellCompleter));
+
 
     loop {
         let readline = rl.readline("$ ");
