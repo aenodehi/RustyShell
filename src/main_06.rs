@@ -147,34 +147,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         history.push(trimmed.to_string());
 
-        if command == "history" {
-            match args.len() {
-                0 => {
-
-                    for (i, cmd) in history.iter().enumerate() {
-                        println!("{}  {}", i + 1, cmd);
-                    }
-                }
-                1 => {
-                    if let Ok(n) = args[0].parse::<usize>() {
-                        let total = history.len();
-
-                        let start = total.saturating_sub(n);
-                        for (i, cmd) in history.iter().enumerate().skip(start) {
-                            println!("{:>4}  {}", i + 1, cmd);
-                        }
-                    } else {
-                        eprintln!("history: {}: numeric argument required", args[0]);
-                    }
-                }
-                _ => {
-                    eprintln!("history: too many arguments");
-                }
+        if trimmed == "history" {
+            for (i, cmd) in history.iter().enumerate() {
+                println!("{}  {}", i + 1, cmd);
             }
             continue;
         }
 
-        if command == "type" && args.get(0).map(|s| s.as_str()) == Some("history") {
+        if trimmed == "type history" {
             println!("history is a shell builtin");
             continue;
         }
