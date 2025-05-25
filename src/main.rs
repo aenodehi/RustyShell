@@ -2,10 +2,7 @@ use std::io::{self, Write};
 use std::process::{self, Command, Stdio};
 use std::path::Path;
 use std::os::unix::fs::PermissionsExt;
-use std::os::unix::process::CommandExt;
 use std::fs::File;
-use std::io::Error;
-
 
 fn main() {
     loop {
@@ -15,8 +12,7 @@ fn main() {
 
         // Input
         let mut input = String::new();
-        let bytes_read = io::stdin().read_line(&mut input).unwrap();
-        if bytes_read == 0 {
+        if io::stdin().read_line(&mut input).unwrap() == 0 {
             break;
         }
 
@@ -29,6 +25,7 @@ fn main() {
         if parts.is_empty() {
             continue;
         }
+
         let command = &parts[0];
         let args = &parts[1..];
 
@@ -45,11 +42,11 @@ fn main() {
             let mut i = 0;
             while i < args.len() {
                 if args[i] == ">" || args[i] == "1>" {
-                    if i+1 < args.len() {
-                        match File::create(&args[i+1]) {
+                    if i + 1 < args.len() {
+                        match File::create(&args[i + 1]) {
                             Ok(file) => stdout_redirect = Some(file),
                             Err(e) => {
-                                eprintln!("{}: {}", args[i+1], e);
+                                eprintln!("{}: {}", args[i + 1], e);
                                 break;
                             }
                         }
@@ -60,15 +57,14 @@ fn main() {
                         break;
                     }
                 }
-                
+
                 cleaned_args.push(args[i].clone());
                 i += 1;
             }
 
             let output = cleaned_args.join(" ");
-
             if let Some(mut file) = stdout_redirect {
-                if let Err(e) = writeln!(file, "{}", output){
+                if let Err(e) = writeln!(file, "{}", output) {
                     eprintln!("echo: failed to write to file: {}", e);
                 }
             } else {
@@ -77,10 +73,10 @@ fn main() {
             continue;
         }
 
-        // Builtin: type 
+        // Builtin: type
         if command == "type" {
             if let Some(arg) = args.first() {
-                if *arg == "echo" || *arg == "exit" || *arg == "type" || *arg == "pwd" {
+                if ["echo", "exit", "type", "pwd", "cd"].contains(&arg.as_str()) {
                     println!("{} is a shell builtin", arg);
                     continue;
                 }
@@ -99,12 +95,11 @@ fn main() {
                     if !found {
                         println!("{}: not found", arg);
                     }
-                    continue;
                 }
             } else {
                 println!("type: missing argument");
-                continue;
             }
+            continue;
         }
 
         // Builtin: pwd
@@ -138,11 +133,41 @@ fn main() {
             continue;
         }
 
-        // Try to run external program
+        // External command execution
         if let Ok(path_var) = std::env::var("PATH") {
+            let (mut args_vec, stderr_redirect) =
+                parse_command_with_stderr_redirection(args.to_vec());
+            let mut stdout_redirect: Option<File> = None;
+
+            // Handle stdout redirection
+            let mut i = 0;
+            while i < args_vec.len() {
+                if args_vec[i] == ">" || args_vec[i] == "1>" {
+                    if i + 1 < args_vec.len() {
+                        let filename = args_vec[i + 1].clone();
+                        match File::create(&filename) {
+                            Ok(file) => {
+                                stdout_redirect = Some(file);
+                                args_vec.drain(i..=i + 1);
+                                continue;
+                            }
+                            Err(e) => {
+                                eprintln!("{}: {}", filename, e);
+                                break;
+                            }
+                        }
+                    } else {
+                        eprintln!("{}: missing filename", args_vec[i]);
+                        break;
+                    }
+                }
+                i += 1;
+            }
+
             let mut found = false;
+
             for dir in path_var.split(':') {
-                let full_path = Path::new(dir).join(&command);
+                let full_path = Path::new(dir).join(command);
                 if full_path.exists()
                     && full_path.is_file()
                     && full_path
@@ -151,50 +176,40 @@ fn main() {
                         .unwrap_or(false)
                 {
                     found = true;
-                    let mut args_vec = args.to_vec();
-                    let mut stdout_redirect: Option<File> = None;
-
-                    let mut i = 0;
-                    while i < args_vec.len() {
-                        if args_vec[i] == ">" || args_vec[i] == "1>" {
-                            if i + 1 < args_vec.len() {
-                                let filename = args_vec[i + 1].clone();
-                                match File::create(&filename) {
-                                    Ok(file) => {
-                                        stdout_redirect = Some(file);
-                                        args_vec.drain(i..=i + 1);
-                                        continue;
-                                    }
-                                    Err(e) => {
-                                        eprintln!("{}: {}", filename, e);
-                                        break;
-                                    }
-                                }
-                            } else {
-                                eprintln!("{}: missing filename", args_vec[i]);
-                                break;
-                            }
-                        }
-                        i += 1;
-                    }
 
                     let mut cmd = Command::new(full_path);
                     cmd.arg0(&command).args(&args_vec);
 
+                    // Handle stdout
                     if let Some(ref file) = stdout_redirect {
                         cmd.stdout(Stdio::from(file.try_clone().unwrap()));
                     } else {
                         cmd.stdout(Stdio::piped());
                     }
 
-                    cmd.stderr(Stdio::piped());
+                    // Handle stderr
+                    if let Some(stderr_file) = stderr_redirect {
+                        match File::create(&stderr_file) {
+                            Ok(file) => {
+                                cmd.stderr(Stdio::from(file));
+                            }
+                            Err(e) => {
+                                eprintln!("{}: {}", stderr_file, e);
+                                continue;
+                            }
+                        }
+                    } else {
+                        cmd.stderr(Stdio::piped());
+                    }
 
                     match cmd.spawn().and_then(|child| child.wait_with_output()) {
                         Ok(output) => {
                             if stdout_redirect.is_none() {
                                 print!("{}", String::from_utf8_lossy(&output.stdout));
                             }
-                            eprint!("{}", String::from_utf8_lossy(&output.stderr));
+                            if stderr_redirect.is_none() {
+                                eprint!("{}", String::from_utf8_lossy(&output.stderr));
+                            }
                         }
                         Err(e) => {
                             eprintln!("Failed to execute {}: {}", command, e);
@@ -220,39 +235,24 @@ fn tokenize(input: &str) -> Vec<String> {
 
     while let Some(ch) = chars.next() {
         match ch {
-            // Toggle single quote context
-            '\'' if !in_double_quotes => {
-                in_single_quotes = !in_single_quotes;
-            }
-
-            // Toggle double quote context
-            '"' if !in_single_quotes => {
-                in_double_quotes = !in_double_quotes;
-            }
-
-            // Handle backslash
+            '\'' if !in_double_quotes => in_single_quotes = !in_single_quotes,
+            '"' if !in_single_quotes => in_double_quotes = !in_double_quotes,
             '\\' => {
                 if in_single_quotes {
                     current.push('\\');
                 } else if let Some(next_ch) = chars.next() {
-                    if in_double_quotes {
-                        if next_ch == '\\' || next_ch == '"' || next_ch == '$' || next_ch == '\n' {
-                            if next_ch != '\n' {
-                                current.push(next_ch);
-                            }
-                        } else {
-                            current.push('\\');
+                    if in_double_quotes && ['\\', '"', '$', '\n'].contains(&next_ch) {
+                        if next_ch != '\n' {
                             current.push(next_ch);
                         }
                     } else {
+                        current.push('\\');
                         current.push(next_ch);
                     }
                 } else {
                     current.push('\\');
                 }
             }
-
-            // Whitespace (token boundary) outside any quotes
             ' ' | '\t' if !in_single_quotes && !in_double_quotes => {
                 if !current.is_empty() {
                     tokens.push(current.clone());
@@ -266,10 +266,7 @@ fn tokenize(input: &str) -> Vec<String> {
                     }
                 }
             }
-
-            _ => {
-                current.push(ch);
-            }
+            _ => current.push(ch),
         }
     }
 
@@ -279,7 +276,6 @@ fn tokenize(input: &str) -> Vec<String> {
 
     tokens
 }
-
 
 fn parse_command_with_stderr_redirection(parts: Vec<String>) -> (Vec<String>, Option<String>) {
     let mut cmd_parts = Vec::new();
@@ -298,3 +294,4 @@ fn parse_command_with_stderr_redirection(parts: Vec<String>) -> (Vec<String>, Op
 
     (cmd_parts, stderr_file)
 }
+
