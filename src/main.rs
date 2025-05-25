@@ -290,6 +290,7 @@ fn run_external(mut tokens: Vec<String>) -> Result<(), Box<dyn std::error::Error
     }
 
     println!("{}: command not found", command);
+    Ok(())
 }
 
 // ========== Redirection Helpers ==========
