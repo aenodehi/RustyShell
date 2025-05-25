@@ -191,7 +191,7 @@ fn main() {
         // External command
         if let Ok(path_var) = std::env::var("PATH") {
             let mut args_vec = parts.clone();
-            let stderr_redirect = parse_stderr_redirection(&mut args_vec);
+            let stderr_result = parse_stderr_redirection(&mut args_vec);
             let _stdout_redirect: Option<File> = None;
             
 
@@ -268,11 +268,18 @@ fn main() {
                         cmd.stdout(Stdio::piped());
                     }
 
-                    if let Some(ref stderr_file) = stderr_redirect {
-                        match File::create(stderr_file) {
+
+                    if let Some((ref stderr_file, append_mode)) = stderr_result {
+                        let file = if append_mode {
+                            OpenOptions::new().append(true).create(true).open(stderr_file)
+                        } else {
+                            File::create(stderr_file)
+                        };
+                        match file {
                             Ok(file) => {
                                 cmd.stderr(Stdio::from(file));
                             }
+
                             Err(e) => {
                                 eprintln!("{}: {}", stderr_file, e);
                                 continue;
@@ -287,7 +294,7 @@ fn main() {
                             if stdout_redirect.is_none() {
                                 print!("{}", String::from_utf8_lossy(&output.stdout));
                             }
-                            if stderr_redirect.is_none() {
+                            if stderr_result.is_none() {
                                 eprint!("{}", String::from_utf8_lossy(&output.stderr));
                             }
                         }
@@ -361,20 +368,23 @@ fn tokenize(input: &str) -> Vec<String> {
     tokens
 }
 
-fn parse_stderr_redirection(args: &mut Vec<String>) -> Option<String> {
+fn parse_stderr_redirection(args: &mut Vec<String>) -> Option<(String, bool)> {
     let mut stderr_file = None;
+    let mut append_mode = false;
     let mut i = 0;
-    
+
     while i < args.len() {
-        if args[i] == "2>" {
+        if args[i] == "2>" || args[i] == "2>>" {
             if i + 1 < args.len() {
                 stderr_file = Some(args[i + 1].clone());
+                append_mode = args[i] == "2>>";
                 args.drain(i..=i + 1);
                 continue;
             }
         }
         i += 1;
     }
-    
-    stderr_file
+
+    stderr_file.map(|f| (f, append_mode))
 }
+
