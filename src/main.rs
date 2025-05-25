@@ -16,7 +16,7 @@ use rustyline::validate::{Validator, ValidationResult, ValidationContext};
 use rustyline::history::FileHistory;
 
 use nix::sys::wait::waitpid;
-use nix::unistd::{close, dup2, execvp, fork, pipe, ForkResult};
+use nix::unistd::{close, execvp, fork, pipe, ForkResult};
 //use nix::unistd::dup2;
 use std::ffi::CString;
 //use std::os::unix::io::RawFd;
