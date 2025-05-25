@@ -8,47 +8,37 @@ use std::fs::{File, OpenOptions};
 use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::{Editor, Helper, Context};
-
-struct ShellCompleter;
-
 use rustyline::highlight::Highlighter;
 use rustyline::hint::{Hinter, Hint};
 use rustyline::validate::{Validator, ValidationResult, ValidationContext};
 
+struct ShellCompleter;
+
 impl Hinter for ShellCompleter {
     type Hint = String;
-    fn hint(&self, _line: &str, _pos: usize, _ctx: &rustyline::Context<'_>) -> Option<String> {
+    fn hint(&self, _line: &str, _pos: usize, _ctx: &Context<'_>) -> Option<String> {
         None
     }
 }
 
 impl Highlighter for ShellCompleter {}
-
 impl Validator for ShellCompleter {
     fn validate(&self, _ctx: &mut ValidationContext<'_>) -> Result<ValidationResult, ReadlineError> {
         Ok(ValidationResult::Valid(None))
     }
 }
-
-
 impl Completer for ShellCompleter {
     type Candidate = Pair;
-
     fn complete(&self, line: &str, pos: usize, _ctx: &Context<'_>) -> Result<(usize, Vec<Pair>), ReadlineError> {
         let builtins = vec!["echo", "exit"];
         let input = &line[..pos];
-        let matches: Vec<Pair> = builtins
-            .iter()
-            .filter(|cmd| cmd.starts_with(input))
-            .map(|cmd| Pair {
-                display: cmd.to_string(),
-                replacement: format!("{} ", cmd),
-            })
-            .collect();
+        let matches: Vec<Pair> = builtins.iter().filter(|cmd| cmd.starts_with(input)).map(|cmd| Pair {
+            display: cmd.to_string(),
+            replacement: format!("{} ", cmd),
+        }).collect();
         Ok((0, matches))
     }
 }
-
 impl Helper for ShellCompleter {}
 
 fn main() {
@@ -65,8 +55,7 @@ fn main() {
                 rl.add_history_entry(line.as_str());
                 line
             }
-            Err(ReadlineError::Interrupted) => break,
-            Err(ReadlineError::Eof) => break,
+            Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
             Err(_) => continue,
         };
 
@@ -219,10 +208,29 @@ fn main() {
             continue;
         }
 
-        // External command
+        // External command execution
         if let Ok(path_var) = std::env::var("PATH") {
             let mut args_vec = parts.clone();
-            let stderr_redirect = parse_stderr_redirection(&mut args_vec);
+            let (stderr_path_opt, stderr_append) = parse_stderr_redirection(&mut args_vec);
+            let mut stderr_file: Option<File> = None;
+
+            if let Some(ref stderr_path) = stderr_path_opt {
+                if let Some(parent) = Path::new(stderr_path).parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                let result = if stderr_append {
+                    OpenOptions::new().append(true).create(true).open(stderr_path)
+                } else {
+                    File::create(stderr_path)
+                };
+                match result {
+                    Ok(file) => stderr_file = Some(file),
+                    Err(e) => {
+                        eprintln!("{}: {}", stderr_path, e);
+                    }
+                }
+            }
+
             let mut stdout_redirect: Option<File> = None;
 
             let command = if !args_vec.is_empty() {
@@ -233,28 +241,15 @@ fn main() {
 
             let mut i = 0;
             while i < args_vec.len() {
-                if args_vec[i] == ">" || args_vec[i] == "1>" {
+                if args_vec[i] == ">" || args_vec[i] == "1>" || args_vec[i] == ">>" || args_vec[i] == "1>>" {
                     if i + 1 < args_vec.len() {
                         let filename = args_vec[i + 1].clone();
-                        match File::create(&filename) {
-                            Ok(file) => {
-                                stdout_redirect = Some(file);
-                                args_vec.drain(i..=i + 1);
-                                continue;
-                            }
-                            Err(e) => {
-                                eprintln!("{}: {}", filename, e);
-                                break;
-                            }
-                        }
-                    }
-                } else if args_vec[i] == ">>" {
-                    if i + 1 < args_vec.len() {
-                        let filename = args_vec[i + 1].clone();
-                        if let Some(parent) = Path::new(&filename).parent() {
-                            let _ = std::fs::create_dir_all(parent);
-                        }
-                        match OpenOptions::new().append(true).create(true).open(&filename) {
+                        let result = if args_vec[i].ends_with(">>") {
+                            OpenOptions::new().append(true).create(true).open(&filename)
+                        } else {
+                            File::create(&filename)
+                        };
+                        match result {
                             Ok(file) => {
                                 stdout_redirect = Some(file);
                                 args_vec.drain(i..=i + 1);
@@ -271,16 +266,10 @@ fn main() {
             }
 
             let mut found = false;
-
             for dir in path_var.split(':') {
                 let full_path = Path::new(dir).join(&command);
-                if full_path.exists()
-                    && full_path.is_file()
-                    && full_path
-                        .metadata()
-                        .map(|m| m.permissions().mode() & 0o111 != 0)
-                        .unwrap_or(false)
-                {
+                if full_path.exists() && full_path.is_file()
+                    && full_path.metadata().map(|m| m.permissions().mode() & 0o111 != 0).unwrap_or(false) {
                     found = true;
 
                     let mut cmd = Command::new(full_path);
@@ -293,16 +282,8 @@ fn main() {
                         cmd.stdout(Stdio::piped());
                     }
 
-                    if let Some(ref stderr_file) = stderr_redirect {
-                        match File::create(stderr_file) {
-                            Ok(file) => {
-                                cmd.stderr(Stdio::from(file));
-                            }
-                            Err(e) => {
-                                eprintln!("{}: {}", stderr_file, e);
-                                continue;
-                            }
-                        }
+                    if let Some(file) = &stderr_file {
+                        cmd.stderr(Stdio::from(file.try_clone().unwrap()));
                     } else {
                         cmd.stderr(Stdio::piped());
                     }
@@ -312,7 +293,7 @@ fn main() {
                             if stdout_redirect.is_none() {
                                 print!("{}", String::from_utf8_lossy(&output.stdout));
                             }
-                            if stderr_redirect.is_none() {
+                            if stderr_file.is_none() {
                                 eprint!("{}", String::from_utf8_lossy(&output.stderr));
                             }
                         }
@@ -384,14 +365,16 @@ fn tokenize(input: &str) -> Vec<String> {
     tokens
 }
 
-fn parse_stderr_redirection(args: &mut Vec<String>) -> Option<String> {
+fn parse_stderr_redirection(args: &mut Vec<String>) -> (Option<String>, bool) {
     let mut stderr_file = None;
+    let mut append = false;
     let mut i = 0;
 
     while i < args.len() {
-        if args[i] == "2>" {
+        if args[i] == "2>" || args[i] == "2>>" {
             if i + 1 < args.len() {
                 stderr_file = Some(args[i + 1].clone());
+                append = args[i] == "2>>";
                 args.drain(i..=i + 1);
                 continue;
             }
@@ -399,16 +382,13 @@ fn parse_stderr_redirection(args: &mut Vec<String>) -> Option<String> {
         i += 1;
     }
 
-    stderr_file
+    (stderr_file, append)
 }
 
 fn check_executable(path: &Path, arg: &str) -> bool {
     if path.exists()
         && path.is_file()
-        && path
-            .metadata()
-            .map(|m| m.permissions().mode() & 0o111 != 0)
-            .unwrap_or(false)
+        && path.metadata().map(|m| m.permissions().mode() & 0o111 != 0).unwrap_or(false)
     {
         println!("{} is {}", arg, path.display());
         true
