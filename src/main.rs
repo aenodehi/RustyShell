@@ -77,11 +77,11 @@ impl Completer for ShellCompleter {
     }
 
     let start = input.len().saturating_sub(prefix.len());
-    Ok((start, suggestions))
+    // Ok((start, suggestions))
+    Ok((0, vec![]))
 }
 }
 
-impl Helper for ShellCompleter {}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 
