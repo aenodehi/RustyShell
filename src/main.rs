@@ -15,6 +15,9 @@ use rustyline::hint::Hinter;
 use rustyline::validate::{Validator, ValidationResult, ValidationContext};
 use rustyline::history::FileHistory;
 
+use std::os::unix::io::FromRawFd;
+use nix::unistd::{pipe, close, dup2};
+
 struct ShellCompleter;
 
 impl Hinter for ShellCompleter {
@@ -120,6 +123,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if parts.is_empty() {
             continue;
         }
+
+        if trimmed.contains('|') {
+                let pipeline_parts: Vec<Vec<String>> = trimmed
+                    .split('|')
+                    .map(|s| tokenize(s.trim()))
+                    .collect();
+
+                execute_pipeline(pipeline_parts);
+            } else {
+                let tokens = tokenize(trimmed);
+                execute(tokens);
+            }
 
         let command = &parts[0];
         let args = &parts[1..];
@@ -453,4 +468,48 @@ fn check_executable(path: &Path, arg: &str) -> bool {
     }
 }
 
+fn execute_pipeline(commands: Vec<Vec<String>>) {
+    let mut prev_fd = None;
 
+    for (i, cmd) in commands.iter().enumerate() {
+        let (reader, writer) = if i < commands.len() - 1 {
+            let (r, w) = pipe().expect("pipe failed");
+            (Some(r), Some(w))
+        } else {
+            (None, None)
+        };
+
+        let mut child = Command::new(&cmd[0]);
+        child.args(&cmd[1..]);
+
+        if let Some(prev) = prev_fd {
+            unsafe {
+                child.stdin(Stdio::from_raw_fd(prev));
+            }
+        }
+
+        if let Some(w) = writer {
+            unsafe {
+                child.stdout(Stdio::from_raw_fd(w));
+            }
+        }
+
+        let mut child = match child.spawn() {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Failed to run {}: {}", cmd[0], e);
+                break;
+            }
+        };
+
+        if let Some(w) = writer {
+            let _ = close(w);
+        }
+
+        if let Some(prev) = prev_fd {
+            let _ = close(prev);
+        }
+
+        prev_fd = reader;
+    }
+}
