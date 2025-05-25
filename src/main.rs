@@ -97,7 +97,12 @@ fn main() {
                 if let Ok(path_var) = std::env::var("PATH") {
                     let found = path_var.split(':').any(|dir| {
                         let full_path = Path::new(dir).join(arg);
-                        if full_path.exists() && full_path.is_file() {
+                        if full_path.exists() 
+                            && full_path.is_file()
+                                && full_path.metadata()
+                                .map(|m| m.permissions().mode() & 0o111 != 0)
+                                .unwrap_or(false)
+                        {
                             println!("{} is {}", arg, full_path.display());
                             true
                         } else {
@@ -108,6 +113,8 @@ fn main() {
                     if !found {
                         println!("{}: not found", arg);
                     }
+                } else {
+                    println!("{}: not found", arg);
                 }
             } else {
                 println!("type: missing argument");
