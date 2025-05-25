@@ -16,10 +16,10 @@ use rustyline::validate::{Validator, ValidationResult, ValidationContext};
 use rustyline::history::FileHistory;
 
 use nix::sys::wait::waitpid;
-use nix::unistd::{close, dup2, execvp, fork, pipe};
-use nix::unistd::ForkResult;
+use nix::unistd::{close, dup2, execvp, fork, pipe, ForkResult};
 use std::ffi::CString;
-use std::os::unix::io::{RawFd, IntoRawFd};
+use std::os::unix::io::RawFd;
+use libc;
 
 struct ShellCompleter;
 
@@ -463,6 +463,8 @@ fn check_executable(path: &Path, arg: &str) -> bool {
     }
 }
 
+
+
 fn handle_pipeline(cmd: &str) {
     let parts: Vec<&str> = cmd.split('|').map(str::trim).collect();
     if parts.len() != 2 {
@@ -479,39 +481,47 @@ fn handle_pipeline(cmd: &str) {
         .map(|s| CString::new(s).unwrap())
         .collect();
 
-    //let (read_end, write_end): (RawFd, RawFd) = pipe().expect("pipe failed");
-    let (read_end, write_end) = {
+    let (read_end, write_end): (RawFd, RawFd) = {
         let (r, w) = pipe().expect("pipe failed");
         (r.into_raw_fd(), w.into_raw_fd())
     };
 
     match unsafe { fork() } {
         Ok(ForkResult::Child) => {
-            // First command: set stdout to write end of pipe
-            dup2(write_end, 1).expect("dup2 failed");
+            // First child: execute left side of pipe
+            unsafe {
+                libc::dup2(write_end, libc::STDOUT_FILENO);
+            }
             close(read_end).ok();
             close(write_end).ok();
-            execvp(&left_cmd[0], &left_cmd).expect("execvp failed");
+            execvp(&left_cmd[0], &left_cmd).expect("execvp failed for left command");
         }
-        Ok(ForkResult::Parent) => {
+        Ok(ForkResult::Parent { .. }) => {
             match unsafe { fork() } {
                 Ok(ForkResult::Child) => {
-                    // Second command: set stdin to read end of pipe
-                    dup2(read_end, 0).expect("dup2 failed");
+                    // Second child: execute right side of pipe
+                    unsafe {
+                        libc::dup2(read_end, libc::STDIN_FILENO);
+                    }
                     close(read_end).ok();
                     close(write_end).ok();
-                    execvp(&right_cmd[0], &right_cmd).expect("execvp failed");
+                    execvp(&right_cmd[0], &right_cmd).expect("execvp failed for right command");
                 }
-                Ok(ForkResult::Parent) => {
-                    // Parent closes both ends and waits
+                Ok(ForkResult::Parent { .. }) => {
+                    // Parent process
                     close(read_end).ok();
                     close(write_end).ok();
                     waitpid(None, None).ok();
                     waitpid(None, None).ok();
                 }
-                Err(_) => eprintln!("Failed to fork second process"),
+                Err(_) => {
+                    eprintln!("Failed to fork second child");
+                }
             }
         }
-        Err(_) => eprintln!("Failed to fork first process"),
+        Err(_) => {
+            eprintln!("Failed to fork first child");
+        }
     }
 }
+
