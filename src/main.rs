@@ -22,7 +22,6 @@ use std::os::unix::io::RawFd;
 use std::os::fd::IntoRawFd;
 use libc;
 
-use std::process;
 
 struct ShellCompleter;
 
