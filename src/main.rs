@@ -4,6 +4,7 @@ use std::path::Path;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::process::CommandExt;
 use std::fs::File;
+use std::fs::OpenOptions;
 
 
 fn main() {
