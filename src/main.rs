@@ -83,7 +83,7 @@ impl Completer for ShellCompleter {
 
 impl Helper for ShellCompleter {}
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = Config::builder()
         .completion_type(CompletionType::List)
