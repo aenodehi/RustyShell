@@ -15,6 +15,10 @@ use rustyline::hint::Hinter;
 use rustyline::validate::{Validator, ValidationResult, ValidationContext};
 use rustyline::history::FileHistory;
 
+use nix::sys::wait::waitpid;
+use nix::unistd::{close, dup2, execvp, fork, pipe};
+use nix::unistd::ForkResult;
+
 struct ShellCompleter;
 
 impl Hinter for ShellCompleter {
