@@ -189,7 +189,7 @@ fn main() {
                     }
 
                     // Handle stderr
-                    if let Some(stderr_file) = stderr_redirect {
+                    if let Some(ref stderr_file) = stderr_redirect {
                         match File::create(&stderr_file) {
                             Ok(file) => {
                                 cmd.stderr(Stdio::from(file));
