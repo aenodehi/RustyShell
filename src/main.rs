@@ -573,7 +573,6 @@ fn run_builtin(
     }
 }
 
-
 fn handle_pipeline(cmd_line: &str) {
     let stages: Vec<&str> = cmd_line.split('|').map(str::trim).collect();
     let num_cmds = stages.len();
@@ -583,9 +582,8 @@ fn handle_pipeline(cmd_line: &str) {
         return;
     }
 
+    // Prepare N–1 pipes
     let mut pipes = Vec::with_capacity(num_cmds - 1);
-
-    // Create all needed pipes
     for _ in 0..(num_cmds - 1) {
         match pipe() {
             Ok((r, w)) => pipes.push((r, w)),
@@ -596,49 +594,59 @@ fn handle_pipeline(cmd_line: &str) {
         }
     }
 
+    // Fork each stage
     for i in 0..num_cmds {
-        let stage = stages[i].trim();
+        let stage = stages[i];
         let parts: Vec<String> = tokenize(stage);
-        let cmd = parts.get(0).map(String::as_str);
-        let args: Vec<String> = parts.iter().skip(1).cloned().collect();
+        let cmd_name = parts[0].as_str();
+        let args: Vec<&str> = parts.iter().skip(1).map(|s| s.as_str()).collect();
 
         match unsafe { fork() } {
             Ok(ForkResult::Child) => {
-                // Input redirection for intermediate or last commands
+                // If not first, read from previous pipe
                 if i > 0 {
                     let (prev_read, _) = &pipes[i - 1];
                     unsafe { libc::dup2(prev_read.as_raw_fd(), libc::STDIN_FILENO) };
                 }
-
-                // Output redirection for intermediate or first commands
+                // If not last, write to next pipe
                 if i < num_cmds - 1 {
-                    let (_, ref next_write) = &pipes[i];
+                    let (_, next_write) = &pipes[i];
                     unsafe { libc::dup2(next_write.as_raw_fd(), libc::STDOUT_FILENO) };
                 }
 
-                // Close all pipe fds in child
-                for (read_fd, write_fd) in &pipes {
-                    let _ = close(read_fd.as_raw_fd());
-                    let _ = close(write_fd.as_raw_fd());
-                }
-
-                if let Some(command) = cmd {
-                    if is_builtin(command) {
-                        let arg_refs: Vec<&str> = args.iter().map(AsRef::as_ref).collect();
-                        run_builtin(command, &arg_refs, None, None);
-                        process::exit(0);
+                // **Suppress Broken pipe** on intermediate stages
+                if i < num_cmds - 1 {
+                    if let Ok(devnull) = OpenOptions::new().read(true).open("/dev/null") {
+                        unsafe {
+                            libc::dup2(devnull.as_raw_fd(), libc::STDERR_FILENO);
+                        }
                     }
-
-                    let cstrs: Vec<CString> = parts.iter()
-                        .map(|s| CString::new(s.as_str()).unwrap())
-                        .collect();
-
-                    execvp(&cstrs[0], &cstrs).expect("execvp failed");
                 }
-                process::exit(1);
+
+                // Close all pipe fds
+                for (r_fd, w_fd) in &pipes {
+                    let _ = close(r_fd.as_raw_fd());
+                    let _ = close(w_fd.as_raw_fd());
+                }
+
+                // Builtin?
+                if is_builtin(cmd_name) {
+                    run_builtin(cmd_name, &args, None, None);
+                    process::exit(0);
+                }
+
+                // External exec
+                let cstrs: Vec<CString> = parts
+                    .iter()
+                    .map(|s| CString::new(s.as_str()).unwrap())
+                    .collect();
+                execvp(&cstrs[0], &cstrs).unwrap_or_else(|e| {
+                    eprintln!("execvp failed: {}", e);
+                    process::exit(1);
+                });
             }
             Ok(ForkResult::Parent { .. }) => {
-                // Parent continues loop
+                // parent continues to next stage
             }
             Err(e) => {
                 eprintln!("fork failed: {}", e);
@@ -647,13 +655,13 @@ fn handle_pipeline(cmd_line: &str) {
         }
     }
 
-    // Parent closes all pipe ends
-    for (read_fd, write_fd) in pipes {
-        let _ = close(read_fd);
-        let _ = close(write_fd);
+    // Parent: close all pipe ends
+    for (r_fd, w_fd) in pipes {
+        let _ = close(r_fd);
+        let _ = close(w_fd);
     }
 
-    // Wait for all child processes
+    // Wait for all children
     for _ in 0..num_cmds {
         let _ = waitpid(None, None);
     }
