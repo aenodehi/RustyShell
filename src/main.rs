@@ -5,13 +5,12 @@ use std::os::unix::fs::PermissionsExt;
 use std::os::unix::process::CommandExt;
 use std::fs::File;
 
+
 fn main() {
     loop {
-        // Prompt
         print!("$ ");
         io::stdout().flush().unwrap();
 
-        // Input
         let mut input = String::new();
         if io::stdin().read_line(&mut input).unwrap() == 0 {
             break;
@@ -30,12 +29,10 @@ fn main() {
         let command = &parts[0];
         let args = &parts[1..];
 
-        // Builtin: exit
         if trimmed == "exit 0" {
             process::exit(0);
         }
 
-        // Builtin: echo
         if command == "echo" {
             let mut cleaned_args = Vec::new();
             let mut stdout_redirect: Option<File> = None;
@@ -74,7 +71,6 @@ fn main() {
             continue;
         }
 
-        // Builtin: type
         if command == "type" {
             if let Some(arg) = args.first() {
                 if ["echo", "exit", "type", "pwd", "cd"].contains(&arg.as_str()) {
@@ -103,7 +99,6 @@ fn main() {
             continue;
         }
 
-        // Builtin: pwd
         if command == "pwd" {
             match std::env::current_dir() {
                 Ok(path) => println!("{}", path.display()),
@@ -112,7 +107,6 @@ fn main() {
             continue;
         }
 
-        // Builtin: cd
         if command == "cd" {
             if let Some(path) = args.first() {
                 let target_dir = if *path == "~" {
@@ -134,17 +128,19 @@ fn main() {
             continue;
         }
 
-        // External command execution
+        // External command
         if let Ok(path_var) = std::env::var("PATH") {
             let (mut args_vec, stderr_redirect) =
                 parse_command_with_stderr_redirection(parts.clone());
             let mut stdout_redirect: Option<File> = None;
 
-            let command = &args_vec[0];
-            let args = &args_vec[1..];
+            // Clone early to avoid borrowing conflict
+            let command = if !args_vec.is_empty() {
+                args_vec[0].clone()
+            } else {
+                continue;
+            };
 
-
-            // Handle stdout redirection
             let mut i = 0;
             while i < args_vec.len() {
                 if args_vec[i] == ">" || args_vec[i] == "1>" {
@@ -172,7 +168,7 @@ fn main() {
             let mut found = false;
 
             for dir in path_var.split(':') {
-                let full_path = Path::new(dir).join(command);
+                let full_path = Path::new(dir).join(&command);
                 if full_path.exists()
                     && full_path.is_file()
                     && full_path
@@ -183,18 +179,16 @@ fn main() {
                     found = true;
 
                     let mut cmd = Command::new(full_path);
-                    cmd.arg(&command).args(&args_vec);
+                    cmd.arg(&command).args(&args_vec[1..]);
 
-                    // Handle stdout
                     if let Some(ref file) = stdout_redirect {
                         cmd.stdout(Stdio::from(file.try_clone().unwrap()));
                     } else {
                         cmd.stdout(Stdio::piped());
                     }
 
-                    // Handle stderr
                     if let Some(ref stderr_file) = stderr_redirect {
-                        match File::create(&stderr_file) {
+                        match File::create(stderr_file) {
                             Ok(file) => {
                                 cmd.stderr(Stdio::from(file));
                             }
@@ -230,6 +224,8 @@ fn main() {
         }
     }
 }
+
+
 
 fn tokenize(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
