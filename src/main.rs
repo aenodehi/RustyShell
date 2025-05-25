@@ -21,7 +21,7 @@ use rustyline::{
     validate::{ValidationContext, ValidationResult, Validator},
     Context, Editor, Helper, Config, CompletionType,
 };
-
+use libc;
 // ========== Completer Helper ==========
 
 struct ShellCompleter;
