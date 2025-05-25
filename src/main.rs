@@ -7,7 +7,7 @@ use std::fs::{File, OpenOptions};
 
 use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
-use rustyline::{Editor, Helper, Context};
+use rustyline::{Editor, Helper, Context, Config, CompletionType};
 use rustyline::highlight::Highlighter;
 use rustyline::hint::{Hinter, Hint};
 use rustyline::validate::{Validator, ValidationResult, ValidationContext};
@@ -27,6 +27,8 @@ impl Validator for ShellCompleter {
         Ok(ValidationResult::Valid(None))
     }
 }
+impl Helper for ShellCompleter {}
+
 impl Completer for ShellCompleter {
     type Candidate = Pair;
 
@@ -81,8 +83,14 @@ impl Completer for ShellCompleter {
 impl Helper for ShellCompleter {}
 
 fn main() {
-    let mut rl = Editor::new().unwrap();
-    rl.set_helper(Some(ShellCompleter));
+
+    let config = Config::builder()
+        .completion_type(CompletionType::List)
+        .build();
+
+    let mut rl = Editor::with_config(config);
+    let completer = ShellCompleter;
+    rl.set_helper(Some(completer));
 
     loop {
         let readline = rl.readline("$ ");
