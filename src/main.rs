@@ -386,11 +386,11 @@ fn execute_pipeline(commands: Vec<Vec<String>>) {
                     close(fd).ok();
                 }
 
-                if let Err(e) = Command::new(&cmd[0])
+                Command::new(&cmd[0])
                     .args(&cmd[1..])
-                    .exec()
+                    .exec();
                 {
-                    eprintln!("exec failed: {}", e);
+                    eprintln!("exec failed");
                     process::exit(1);
                 }
             }
