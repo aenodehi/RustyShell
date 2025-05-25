@@ -384,10 +384,14 @@ fn execute_pipeline(commands: Vec<Vec<String>>) {
         }
 
         if let Some(w) = writer {
-            close(w).ok();
+            unsafe {
+                libc::close(w);
+            }
         }
         if let Some(r) = prev_fd {
-            close(r).ok();
+            unsafe {
+                libc::close(r);
+            }
         }
 
         prev_fd = reader;
