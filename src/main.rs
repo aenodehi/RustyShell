@@ -21,6 +21,8 @@ use rustyline::{
     validate::{ValidationContext, ValidationResult, Validator},
     Context, Editor, Helper, Config, CompletionType,
 };
+
+use std::io::pipe;
 use libc;
 // ========== Completer Helper ==========
 
