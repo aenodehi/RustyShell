@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io::Write;
 use std::process::{self, Command, Stdio};
 use std::path::Path;
 use std::os::unix::fs::PermissionsExt;
@@ -9,7 +9,7 @@ use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::{Editor, Helper, Context, Config, CompletionType};
 use rustyline::highlight::Highlighter;
-use rustyline::hint::{Hinter, Hint};
+use rustyline::hint::Hinter;
 use rustyline::validate::{Validator, ValidationResult, ValidationContext};
 use rustyline::history::FileHistory;
 
@@ -103,7 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 rl.add_history_entry(line.as_str());
                 line
             }
-            Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
+            Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break Ok(()),
             Err(_) => continue,
         };
 
