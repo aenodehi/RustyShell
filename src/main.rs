@@ -137,6 +137,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if trimmed.contains('|') {
             handle_pipeline(trimmed);
+            continue;
         }
 
         if command == "echo" {
