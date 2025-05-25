@@ -32,7 +32,7 @@ impl Completer for ShellCompleter {
 impl Helper for ShellCompleter {}
 
 fn main() {
-    let mut rl = Editor::<ShellCompleter>::new().unwrap();
+    let mut rl = Editor::new().unwrap();
     rl.set_helper(Some(ShellCompleter));
 
     loop {
@@ -45,6 +45,7 @@ fn main() {
                 rl.add_history_entry(line.as_str());
                 line
             }
+            Err(ReadlineError::Interrupted) => break,
             Err(ReadlineError::Eof) => break,
             Err(_) => continue,
         };
