@@ -263,7 +263,7 @@ fn run_external(mut tokens: Vec<String>) -> Result<(), Box<dyn std::error::Error
                 let mut cmd = Command::new(full_path);
                 cmd.args(&tokens[1..]);
 
-                if let Some(out) = stdout_redirect {
+                if let Some(ref out) = stdout_redirect {
                     cmd.stdout(Stdio::from(out));
                 }
 
