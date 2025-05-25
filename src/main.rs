@@ -34,9 +34,11 @@ fn main() {
             process::exit(0);
         }
 
+       
         if command == "echo" {
     let mut cleaned_args = Vec::new();
     let mut stdout_redirect: Option<File> = None;
+    let mut stderr_redirect: Option<File> = None;
     let mut args = parts[1..].to_vec();
 
     let mut i = 0;
@@ -64,7 +66,31 @@ fn main() {
                     }
                 }
             }
+        } else if args[i] == "2>" || args[i] == "2>>" {
+            if i + 1 < args.len() {
+                let filename = &args[i + 1];
+                if let Some(parent) = Path::new(filename).parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                let file = if args[i] == "2>" {
+                    File::create(filename)
+                } else {
+                    OpenOptions::new().append(true).create(true).open(filename)
+                };
+                match file {
+                    Ok(file) => {
+                        stderr_redirect = Some(file);
+                        args.drain(i..=i + 1);
+                        continue;
+                    }
+                    Err(e) => {
+                        eprintln!("{}: {}", filename, e);
+                        break;
+                    }
+                }
+            }
         }
+
         cleaned_args.push(args[i].clone());
         i += 1;
     }
@@ -72,13 +98,19 @@ fn main() {
     let output = cleaned_args.join(" ");
     if let Some(mut file) = stdout_redirect {
         if let Err(e) = writeln!(file, "{}", output) {
-            eprintln!("echo: failed to write to file: {}", e);
+            if let Some(mut stderr_file) = stderr_redirect {
+                let _ = writeln!(stderr_file, "echo: failed to write to file: {}", e);
+            } else {
+                eprintln!("echo: failed to write to file: {}", e);
+            }
         }
     } else {
         println!("{}", output);
     }
     continue;
 }
+
+
 
         if command == "type" {
             if let Some(arg) = args.first() {
