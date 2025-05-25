@@ -91,7 +91,7 @@ fn main() {
 
     let mut rl = Editor::<_, FileHistory>::with_config(config).unwrap();    
     let completer = ShellCompleter;
-    rl.set_helper(Some(Shellcompleter));
+    rl.set_helper(Some(completer));
 
     loop {
         let readline = rl.readline("$ ");
