@@ -4,6 +4,8 @@ use std::path::Path;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::process::CommandExt;
 use std::fs::File;
+use std::io::Error;
+
 
 fn main() {
     loop {
@@ -278,3 +280,21 @@ fn tokenize(input: &str) -> Vec<String> {
     tokens
 }
 
+
+fn parse_command_with_stderr_redirection(parts: Vec<String>) -> (Vec<String>, option<String>) {
+    let mut cmd_parts = Vec::new();
+    let mut stderr_file = None;
+
+    let mut iter = parts.into_iter().peekable();
+    while let Some(part) = iter.next() {
+        if part == "2>" {
+            if let Some(file) = iter.next() {
+                stderr_file = Some(file);
+            }
+        } else {
+            cmd_parts.push(part);
+        }
+    }
+
+    (cmd_parts, stderr_file)
+}
