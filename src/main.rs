@@ -11,7 +11,7 @@ use std::{
     process::{self, Command, Stdio},
 };
 
-use nix::unistd::{close, dup2, pipe};
+//use nix::unistd::{close, dup2, pipe};
 use rustyline::{
     completion::{Completer, Pair},
     error::ReadlineError,
