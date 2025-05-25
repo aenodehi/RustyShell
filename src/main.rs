@@ -22,7 +22,7 @@ use std::ffi::CString;
 //use std::os::unix::io::RawFd;
 use std::os::fd::IntoRawFd;
 use libc;
-
+use std::os::unix::io::AsRawFd;
 
 struct ShellCompleter;
 
@@ -590,13 +590,13 @@ fn handle_pipeline(cmd_line: &str) {
                 // Input redirection for intermediate or last commands
                 if i > 0 {
                     let (prev_read, _) = pipes[i - 1];
-                    unsafe { libc::dup2(prev_read, libc::STDIN_FILENO) };
+                    unsafe { libc::dup2(prev_read.as_raw_fd(), libc::STDIN_FILENO) };
                 }
 
                 // Output redirection for intermediate or first commands
                 if i < num_cmds - 1 {
                     let (_, next_write) = pipes[i];
-                    unsafe { libc::dup2(next_write, libc::STDOUT_FILENO) };
+                    unsafe { libc::dup2(next_write.as_raw_fd(), libc::STDOUT_FILENO) };
                 }
 
                 // Close all pipe fds in child
