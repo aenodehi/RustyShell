@@ -65,12 +65,17 @@ impl Completer for ShellCompleter {
             }
         }
 
-        // Start of the replacement is the prefix start
-        Ok((0, completions))
+        // Sort by display text for consistent output
+        completions.sort_by(|a, b| a.display.cmp(&b.display));
+
+        // Calculate the start of the word to replace
+        let start = line[..pos]
+            .rfind(|c: char| c == ' ' || c == '\t')
+            .map_or(0, |i| i + 1);
+
+        Ok((start, completions))
     }
 }
-
-
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 
