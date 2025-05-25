@@ -160,6 +160,9 @@ fn main() {
                 continue;
             };
 
+            let mut stdout_redirect: Option<File> = None;
+            let mut append_mode = false;
+
             let mut i = 0;
             while i < args_vec.len() {
                 if args_vec[i] == ">" || args_vec[i] == "1>" {
@@ -176,9 +179,24 @@ fn main() {
                                 break;
                             }
                         }
-                    } else {
-                        eprintln!("{}: missing filename", args_vec[i]);
-                        break;
+                    }
+                } else if args_vec[i] == ">>" {
+                    if i + 1 < args_vec.len() {
+                        let filename = args_vec[i + 1].clone();
+                        if let Some(parent) = Path::new(&filename).parent() {
+                            let _ = std::fs::create_dir_all(parent);
+                        }
+                        match OpenOptions::new().append(true).create(true).open(&filename) {
+                            Ok(file) => {
+                                stdout_redirect = Some(file);
+                                args_vec.drain(i..=i + 1);
+                                continue;
+                            }
+                            Err(e) => {
+                                eprintln!("{}: {}", filename, e);
+                                break;
+                            }
+                        }
                     }
                 }
                 i += 1;
