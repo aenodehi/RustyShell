@@ -33,38 +33,26 @@ impl Helper for ShellCompleter {}
 impl Completer for ShellCompleter {
     type Candidate = Pair;
 
-    fn complete(&self, line: &str, pos: usize, _ctx: &Context<'_>) -> Result<(usize, Vec<Pair>), ReadlineError> {
-    let input = &line[..pos];
-    let prefix = input.split_whitespace().last().unwrap_or("");
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        _ctx: &rustyline::Context<'_>,
+    ) -> Result<(usize, Vec<Pair>), ReadlineError> {
+        let prefix = &line[..pos];
+        let mut completions = vec![];
 
-    let mut suggestions = Vec::new();
-
-    // Built-in commands
-    let builtins = ["echo", "exit", "cd", "pwd", "type"];
-    for &cmd in &builtins {
-        if cmd.starts_with(prefix) {
-            suggestions.push(Pair {
-                display: cmd.to_string(),
-                replacement: format!("{} ", cmd),
-            });
-        }
-    }
-
-    // Executables in PATH
-    if let Ok(path_var) = std::env::var("PATH") {
-        for dir in path_var.split(':') {
-            if let Ok(entries) = std::fs::read_dir(dir) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_file() {
-                        if let Ok(metadata) = path.metadata() {
-                            let permissions = metadata.permissions();
-                            if permissions.mode() & 0o111 != 0 {
-                                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                                    if name.starts_with(prefix) && !builtins.contains(&name) {
-                                        suggestions.push(Pair {
+        if let Ok(paths) = env::var("PATH") {
+            for dir in paths.split(':') {
+                if let Ok(entries) = fs::read_dir(dir) {
+                    for entry in entries.flatten() {
+                        if let Ok(file_type) = entry.file_type() {
+                            if file_type.is_file() {
+                                if let Some(name) = entry.file_name().to_str() {
+                                    if name.starts_with(prefix) {
+                                        completions.push(Pair {
                                             display: name.to_string(),
-                                            replacement: format!("{} ", name),
+                                            replacement: name.to_string(),
                                         });
                                     }
                                 }
@@ -74,13 +62,12 @@ impl Completer for ShellCompleter {
                 }
             }
         }
-    }
 
-    let start = input.len().saturating_sub(prefix.len());
-    // Ok((start, suggestions))
-    Ok((0, vec![]))
+        // Start of the replacement is the prefix start
+        Ok((0, completions))
+    }
 }
-}
+
 
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
