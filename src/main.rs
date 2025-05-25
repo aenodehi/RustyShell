@@ -81,10 +81,6 @@ fn main() {
                 if let Err(e) = writeln!(file, "{}", output) {
                     eprintln!("echo: failed to write to file: {}", e);
                 }
-            } else if let Some(mut file) = stderr_redirect {
-                if let Err(e) = writeln!(file, "{}", output) {
-                    eprintln!("echo: failed to write to file: {}", e);
-                }
             } else {
                 println!("{}", output);
             }
