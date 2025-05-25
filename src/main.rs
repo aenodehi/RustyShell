@@ -36,7 +36,6 @@ fn main() {
         if command == "echo" {
             let mut cleaned_args = Vec::new();
             let mut stdout_redirect: Option<File> = None;
-            let mut stderr_redirect: Option<File> = None;
 
             let mut i = 0;
             while i < args.len() {
@@ -53,21 +52,6 @@ fn main() {
                         continue;
                     } else {
                         eprintln!("{}: missing filename", args[i]);
-                        break;
-                    }
-                } else if args[i] == "2>" {
-                    if i + 1 < args.len() {
-                        match File::create(&args[i + 1]) {
-                            Ok(file) => stderr_redirect = Some(file),
-                            Err(e) => {
-                                eprintln!("{}: {}", args[i + 1], e);
-                                break;
-                            }
-                        }
-                        i += 2;
-                        continue;
-                    } else {
-                        eprintln!("2>: missing filename");
                         break;
                     }
                 }
