@@ -281,7 +281,7 @@ fn tokenize(input: &str) -> Vec<String> {
 }
 
 
-fn parse_command_with_stderr_redirection(parts: Vec<String>) -> (Vec<String>, option<String>) {
+fn parse_command_with_stderr_redirection(parts: Vec<String>) -> (Vec<String>, Option<String>) {
     let mut cmd_parts = Vec::new();
     let mut stderr_file = None;
 
