@@ -102,7 +102,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Err(_) => continue,
         };
 
-        let line = rl.readline("$ ")?;
         let _ = rl.add_history_entry(line.as_str());
 
         let trimmed = input.trim();
