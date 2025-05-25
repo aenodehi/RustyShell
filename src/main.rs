@@ -1,17 +1,22 @@
+
+rust
+Copy
+Edit
 use std::{
     env,
     fs::{self, File, OpenOptions},
     io::Write,
     os::unix::{
         fs::PermissionsExt,
-        io::FromRawFd,
+        io::{FromRawFd, RawFd},
         process::CommandExt,
     },
     path::Path,
     process::{self, Command, Stdio},
 };
 
-//use nix::unistd::{close, dup2, pipe};
+use nix::unistd::{close, dup2, pipe};
+
 use rustyline::{
     completion::{Completer, Pair},
     error::ReadlineError,
@@ -21,10 +26,6 @@ use rustyline::{
     validate::{ValidationContext, ValidationResult, Validator},
     Context, Editor, Helper, Config, CompletionType,
 };
-
-use std::io::pipe;
-use libc;
-// ========== Completer Helper ==========
 
 struct ShellCompleter;
 
@@ -43,6 +44,7 @@ impl Validator for ShellCompleter {
         Ok(ValidationResult::Valid(None))
     }
 }
+
 
 impl Completer for ShellCompleter {
     type Candidate = Pair;
@@ -64,11 +66,10 @@ impl Completer for ShellCompleter {
             for dir in paths.split(':') {
                 if let Ok(entries) = fs::read_dir(dir) {
                     for entry in entries.flatten() {
-                        let file_name = entry.file_name();
-                        let name = file_name.to_string_lossy();
+                        let name = entry.file_name().to_string_lossy().to_string();
                         if name.starts_with(prefix) {
                             completions.push(Pair {
-                                display: name.to_string(),
+                                display: name.clone(),
                                 replacement: format!("{} ", name),
                             });
                         }
@@ -79,13 +80,15 @@ impl Completer for ShellCompleter {
 
         completions.sort_by(|a, b| a.display.cmp(&b.display));
 
-        let start = line[..pos]
-            .rfind(|c: char| c == ' ' || c == '\t')
-            .map_or(0, |i| i + 1);
+        let start = prefix.rfind(|c: char| c == ' ' || c == '\t').map_or(0, |i| i + 1);
 
         Ok((start, completions))
     }
 }
+
+
+
+
 
 // ========== Main ==========
 
@@ -128,12 +131,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             continue;
         }
 
-        run_external(tokens);
+        run_external(tokens)?;
     }
 }
 
-// ========== Tokenizer ==========
 
+// ========== Tokenizer ==========
 fn tokenize(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current = String::new();
@@ -356,47 +359,56 @@ fn handle_redirection(tokens: &mut Vec<String>) -> (Option<File>, Option<File>) 
 // ========== Pipeline ==========
 
 fn execute_pipeline(commands: Vec<Vec<String>>) {
-    let mut prev_fd = None;
+    let mut prev_read: Option<RawFd> = None;
 
     for (i, cmd) in commands.iter().enumerate() {
         let (reader, writer) = if i < commands.len() - 1 {
-            let (r, w) = pipe().expect("pipe failed");
-            (Some(r), Some(w))
+            match pipe() {
+                Ok((r, w)) => (Some(r), Some(w)),
+                Err(e) => {
+                    eprintln!("pipe error: {}", e);
+                    return;
+                }
+            }
         } else {
             (None, None)
         };
 
-        let mut child = Command::new(&cmd[0]);
-        child.args(&cmd[1..]);
+        match unsafe { libc::fork() } {
+            -1 => {
+                eprintln!("fork failed");
+                return;
+            }
+            0 => {
+                if let Some(fd) = prev_read {
+                    dup2(fd, libc::STDIN_FILENO).ok();
+                    close(fd).ok();
+                }
 
-        if let Some(fd) = prev_fd {
-            unsafe { child.stdin(Stdio::from_raw_fd(fd)); }
-        }
+                if let Some(fd) = writer {
+                    dup2(fd, libc::STDOUT_FILENO).ok();
+                    close(fd).ok();
+                }
 
-        if let Some(w) = writer {
-            unsafe { child.stdout(Stdio::from_raw_fd(w)); }
-        }
+                if let Err(e) = Command::new(&cmd[0])
+                    .args(&cmd[1..])
+                    .exec()
+                {
+                    eprintln!("exec failed: {}", e);
+                    process::exit(1);
+                }
+            }
+            pid => {
+                if let Some(fd) = prev_read {
+                    close(fd).ok();
+                }
+                if let Some(fd) = writer {
+                    close(fd).ok();
+                }
 
-        match child.spawn() {
-            Ok(_) => {}
-            Err(e) => {
-                eprintln!("Pipeline error: {}: {}", cmd[0], e);
-                break;
+                prev_read = reader;
+                unsafe { libc::waitpid(pid, std::ptr::null_mut(), 0) };
             }
         }
-
-        if let Some(w) = writer {
-            unsafe {
-                libc::close(w);
-            }
-        }
-        if let Some(r) = prev_fd {
-            unsafe {
-                libc::close(r);
-            }
-        }
-
-        prev_fd = reader;
     }
 }
-
