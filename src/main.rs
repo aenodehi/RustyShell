@@ -267,8 +267,8 @@ fn run_external(mut tokens: Vec<String>) {
                     cmd.stdout(Stdio::from(out));
                 }
 
-                if let Some(err) = stderr_redirect {
-                    cmd.stderr(Stdio::from(err));
+                if let Some(ref err) = stderr_redirect {
+                    cmd.stderr(Stdio::from(err.try_clone()?));
                 }
 
                 match cmd.spawn().and_then(|c| c.wait_with_output()) {
