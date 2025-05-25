@@ -37,38 +37,22 @@ fn main() {
         if command == "echo" {
     let mut cleaned_args = Vec::new();
     let mut stdout_redirect: Option<File> = None;
-    let mut args = parts[1..].to_vec();  // Convert to Vec here
+    let mut args = parts[1..].to_vec();
 
     let mut i = 0;
     while i < args.len() {
-        if args[i] == ">" || args[i] == "1>" {
-            if i + 1 < args.len() {
-                match File::create(&args[i + 1]) {
-                    Ok(file) => {
-                        stdout_redirect = Some(file);
-                        args.drain(i..=i + 1);
-                        continue;
-                    }
-                    Err(e) => {
-                        eprintln!("{}: {}", args[i + 1], e);
-                        break;
-                    }
-                }
-            } else {
-                eprintln!("{}: missing filename", args[i]);
-                break;
-            }
-        } else if args[i] == ">>" || args[i] == "1>>" {
+        if args[i] == ">" || args[i] == "1>" || args[i] == ">>" || args[i] == "1>>" {
             if i + 1 < args.len() {
                 let filename = &args[i + 1];
                 if let Some(parent) = Path::new(filename).parent() {
                     let _ = std::fs::create_dir_all(parent);
                 }
-                match OpenOptions::new()
-                    .append(true)
-                    .create(true)
-                    .open(filename) 
-                {
+                let file = if args[i] == ">" || args[i] == "1>" {
+                    File::create(filename)
+                } else {
+                    OpenOptions::new().append(true).create(true).open(filename)
+                };
+                match file {
                     Ok(file) => {
                         stdout_redirect = Some(file);
                         args.drain(i..=i + 1);
@@ -79,12 +63,8 @@ fn main() {
                         break;
                     }
                 }
-            } else {
-                eprintln!("{}: missing filename", args[i]);
-                break;
             }
         }
-
         cleaned_args.push(args[i].clone());
         i += 1;
     }
@@ -99,6 +79,7 @@ fn main() {
     }
     continue;
 }
+
         if command == "type" {
             if let Some(arg) = args.first() {
                 if ["echo", "exit", "type", "pwd", "cd"].contains(&arg.as_str()) {
@@ -177,9 +158,10 @@ fn main() {
 
         // External command
         if let Ok(path_var) = std::env::var("PATH") {
-            let mut args_vec = parts[1..].to_vec();
+            let mut args_vec = parts.clone();
             let stderr_redirect = parse_stderr_redirection(&mut args_vec);
             let mut stdout_redirect: Option<File> = None;
+            
 
             // Clone early to avoid borrowing conflict
             let command = if !args_vec.is_empty() {
@@ -230,6 +212,7 @@ fn main() {
                 i += 1;
             }
 
+           
             let mut found = false;
 
             for dir in path_var.split(':') {
