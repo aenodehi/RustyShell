@@ -1,7 +1,3 @@
-
-rust
-Copy
-Edit
 use std::{
     env,
     fs::{self, File, OpenOptions},
