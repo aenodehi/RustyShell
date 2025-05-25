@@ -1,4 +1,6 @@
 use std::io::Write;
+use std::env;
+use std::fs;
 use std::process::{self, Command, Stdio};
 use std::path::Path;
 use std::os::unix::fs::PermissionsExt;
@@ -76,14 +78,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .completion_type(CompletionType::List)
         .build();
 
-    //let mut rl = Editor::<_, FileHistory>::with_config(config).unwrap();    
-    //let completer = ShellCompleter;
-    //rl.set_helper(Some(completer));
+    let mut rl = Editor::<_, FileHistory>::with_config(config).unwrap();    
+    let completer = ShellCompleter;
+    rl.set_helper(Some(completer));
 
-    let mut rl = Editor::<ShellCompleter>::new()?;
-    rl.set_completer(Some(ShellCompleter));
-
-
+  
     loop {
         let readline = rl.readline("$ ");
         let input = match readline {
