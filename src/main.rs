@@ -11,6 +11,26 @@ use rustyline::{Editor, Helper, Context};
 
 struct ShellCompleter;
 
+use rustyline::highlight::Highlighter;
+use rustyline::hint::{Hinter, Hint};
+use rustyline::validate::{Validator, ValidationResult, ValidationContext};
+
+impl Hinter for ShellCompleter {
+    type Hint = String;
+    fn hint(&self, _line: &str, _pos: usize, _ctx: &rustyline::Context<'_>) -> Option<String> {
+        None
+    }
+}
+
+impl Highlighter for ShellCompleter {}
+
+impl Validator for ShellCompleter {
+    fn validate(&self, _ctx: &mut ValidationContext<'_>) -> Result<ValidationResult, ReadlineError> {
+        Ok(ValidationResult::Valid(None))
+    }
+}
+
+
 impl Completer for ShellCompleter {
     type Candidate = Pair;
 
