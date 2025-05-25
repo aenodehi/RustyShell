@@ -262,6 +262,8 @@ fn tokenize(input: &str) -> Vec<String> {
                         if next_ch != '\n' {
                             current.push(next_ch);
                         }
+                    } else if !in_double_quotes && !in_single_quotes {
+                        current.push(next_ch);
                     } else {
                         current.push('\\');
                         current.push(next_ch);
