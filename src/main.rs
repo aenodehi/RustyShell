@@ -96,7 +96,7 @@ fn main() {
 
                 if let Ok(path_var) = std::env::var("PATH") {
                     let found = path_var.split(':').any(|dir| {
-                        let full_path = Path::new(dir).join(arg);
+                        let full_path = Path::new(dir).join(command);
                         if full_path.exists() 
                             && full_path.is_file()
                                 && full_path.metadata()
