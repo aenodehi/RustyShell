@@ -2,6 +2,7 @@ use std::io::{self, Write};
 use std::process::{self, Command, Stdio};
 use std::path::Path;
 use std::os::unix::fs::PermissionsExt;
+use std::os::unix::process::CommandExt;
 use std::fs::File;
 
 fn main() {
@@ -178,7 +179,7 @@ fn main() {
                     found = true;
 
                     let mut cmd = Command::new(full_path);
-                    cmd.arg0(&command).args(&args_vec);
+                    cmd.arg(&command).args(&args_vec);
 
                     // Handle stdout
                     if let Some(ref file) = stdout_redirect {
