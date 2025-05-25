@@ -128,6 +128,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             process::exit(0);
         }
 
+        if trimmed.contains('|') {
+            handle_pipeline(trimmed);
+        }
+
         if command == "echo" {
             let mut cleaned_args = Vec::new();
             let mut stdout_redirect: Option<File> = None;
@@ -453,4 +457,51 @@ fn check_executable(path: &Path, arg: &str) -> bool {
     }
 }
 
+fn handle_pipeline(cmd: &str) {
+    let parts: Vec<&str> = cmd.split('|').map(str::trim).collect();
+    if parts.len() != 2 {
+        eprintln!("Only single pipelines supported");
+        return;
+    }
 
+    let left_cmd: Vec<CString> = parts[0]
+        .split_whitespace()
+        .map(|s| CString::new(s).unwrap())
+        .collect();
+    let right_cmd: Vec<CString> = parts[1]
+        .split_whitespace()
+        .map(|s| CString::new(s).unwrap())
+        .collect();
+
+    let (read_end, write_end): (RawFd, RawFd) = pipe().expect("pipe failed");
+
+    match unsafe { fork() } {
+        Ok(ForkResult::Child) => {
+            // First command: set stdout to write end of pipe
+            dup2(write_end, libc::STDOUT_FILENO).expect("dup2 failed");
+            close(read_end).ok();
+            close(write_end).ok();
+            execvp(&left_cmd[0], &left_cmd).expect("execvp failed");
+        }
+        Ok(ForkResult::Parent) => {
+            match unsafe { fork() } {
+                Ok(ForkResult::Child) => {
+                    // Second command: set stdin to read end of pipe
+                    dup2(read_end, libc::STDIN_FILENO).expect("dup2 failed");
+                    close(read_end).ok();
+                    close(write_end).ok();
+                    execvp(&right_cmd[0], &right_cmd).expect("execvp failed");
+                }
+                Ok(ForkResult::Parent) => {
+                    // Parent closes both ends and waits
+                    close(read_end).ok();
+                    close(write_end).ok();
+                    waitpid(None, None).ok();
+                    waitpid(None, None).ok();
+                }
+                Err(_) => eprintln!("Failed to fork second process"),
+            }
+        }
+        Err(_) => eprintln!("Failed to fork first process"),
+    }
+}
