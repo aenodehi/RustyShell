@@ -137,8 +137,12 @@ fn main() {
         // External command execution
         if let Ok(path_var) = std::env::var("PATH") {
             let (mut args_vec, stderr_redirect) =
-                parse_command_with_stderr_redirection(args.to_vec());
+                parse_command_with_stderr_redirection(parts.clone());
             let mut stdout_redirect: Option<File> = None;
+
+            let command = &args_vec[0];
+            let args = &args_vec[1..];
+
 
             // Handle stdout redirection
             let mut i = 0;
