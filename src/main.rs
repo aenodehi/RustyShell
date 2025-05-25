@@ -644,6 +644,7 @@ fn handle_pipeline(cmd_line: &str) {
                     eprintln!("execvp failed: {}", e);
                     process::exit(1);
                 });
+                unreachable!();
             }
             Ok(ForkResult::Parent { .. }) => {
                 // parent continues to next stage
