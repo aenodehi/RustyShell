@@ -1,4 +1,5 @@
 use std::io::Write;
+//use std::io::{self, Write};
 use std::env;
 use std::fs;
 use std::process::{self, Command, Stdio};
@@ -107,7 +108,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let completer = ShellCompleter;
     rl.set_helper(Some(completer));
 
-  
+    let mut history: Vec<String> = Vec::new();
+
     loop {
         let readline = rl.readline("$ ");
         let input = match readline {
@@ -139,6 +141,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if trimmed.contains('|') {
             handle_pipeline(trimmed);
+            continue;
+        }
+
+
+        history.push(trimmed.to_string());
+
+        if trimmed == "history" {
+            for (i, cmd) in history.iter().enumerate() {
+                println!("{}  {}", i + 1, cmd);
+            }
+            continue;
+        }
+
+        if trimmed == "type history" {
+            println!("history is a shell builtin");
             continue;
         }
 
