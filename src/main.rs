@@ -595,14 +595,14 @@ fn handle_pipeline(cmd_line: &str) {
 
                 // Output redirection for intermediate or first commands
                 if i < num_cmds - 1 {
-                    let (_, next_write) = pipes[i];
+                    let (_, ref next_write) = &pipes[i];
                     unsafe { libc::dup2(next_write.as_raw_fd(), libc::STDOUT_FILENO) };
                 }
 
                 // Close all pipe fds in child
                 for (read_fd, write_fd) in &pipes {
-                    let _ = close(*read_fd);
-                    let _ = close(*write_fd);
+                    let _ = close(read_fd.as_raw_fd());
+                    let _ = close(write_fd.as_raw_fd());
                 }
 
                 if let Some(command) = cmd {
