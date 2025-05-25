@@ -253,7 +253,7 @@ fn check_executable(path: &Path, cmd: &str) -> bool {
 
 fn run_external(mut tokens: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     let command = tokens[0].clone();
-    let (stderr_path, stderr_append) = parse_stderr_redirection(&mut tokens);
+    let (_stderr_path, _stderr_append) = parse_stderr_redirection(&mut tokens);
     let (stdout_redirect, stderr_redirect) = handle_redirection(&mut tokens);
 
     if let Ok(path_var) = env::var("PATH") {
