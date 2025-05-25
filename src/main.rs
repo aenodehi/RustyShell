@@ -29,16 +29,55 @@ impl Validator for ShellCompleter {
 }
 impl Completer for ShellCompleter {
     type Candidate = Pair;
+
     fn complete(&self, line: &str, pos: usize, _ctx: &Context<'_>) -> Result<(usize, Vec<Pair>), ReadlineError> {
-        let builtins = vec!["echo", "exit"];
-        let input = &line[..pos];
-        let matches: Vec<Pair> = builtins.iter().filter(|cmd| cmd.starts_with(input)).map(|cmd| Pair {
-            display: cmd.to_string(),
-            replacement: format!("{} ", cmd),
-        }).collect();
-        Ok((0, matches))
+    let input = &line[..pos];
+    let prefix = input.split_whitespace().last().unwrap_or("");
+
+    let mut suggestions = Vec::new();
+
+    // Built-in commands
+    let builtins = ["echo", "exit", "cd", "pwd", "type"];
+    for &cmd in &builtins {
+        if cmd.starts_with(prefix) {
+            suggestions.push(Pair {
+                display: cmd.to_string(),
+                replacement: format!("{} ", cmd),
+            });
+        }
     }
+
+    // Executables in PATH
+    if let Ok(path_var) = std::env::var("PATH") {
+        for dir in path_var.split(':') {
+            if let Ok(entries) = std::fs::read_dir(dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_file() {
+                        if let Ok(metadata) = path.metadata() {
+                            let permissions = metadata.permissions();
+                            if permissions.mode() & 0o111 != 0 {
+                                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                                    if name.starts_with(prefix) && !builtins.contains(&name) {
+                                        suggestions.push(Pair {
+                                            display: name.to_string(),
+                                            replacement: format!("{} ", name),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let start = input.len().saturating_sub(prefix.len());
+    Ok((start, suggestions))
 }
+}
+
 impl Helper for ShellCompleter {}
 
 fn main() {
@@ -397,51 +436,4 @@ fn check_executable(path: &Path, arg: &str) -> bool {
     }
 }
 
-
-fn complete(&self, line: &str, pos: usize, _ctx: &Context<'_>) -> Result<(usize, Vec<Pair>), ReadlineError> {
-    let input = &line[..pos];
-    let prefix = input.split_whitespace().last().unwrap_or("");
-
-    let mut suggestions = Vec::new();
-
-    // Built-in commands
-    let builtins = ["echo", "exit", "cd", "pwd", "type"];
-    for &cmd in &builtins {
-        if cmd.starts_with(prefix) {
-            suggestions.push(Pair {
-                display: cmd.to_string(),
-                replacement: format!("{} ", cmd),
-            });
-        }
-    }
-
-    // Executables in PATH
-    if let Ok(path_var) = std::env::var("PATH") {
-        for dir in path_var.split(':') {
-            if let Ok(entries) = std::fs::read_dir(dir) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_file() {
-                        if let Ok(metadata) = path.metadata() {
-                            let permissions = metadata.permissions();
-                            if permissions.mode() & 0o111 != 0 {
-                                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                                    if name.starts_with(prefix) && !builtins.contains(&name) {
-                                        suggestions.push(Pair {
-                                            display: name.to_string(),
-                                            replacement: format!("{} ", name),
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    let start = input.len().saturating_sub(prefix.len());
-    Ok((start, suggestions))
-}
 
