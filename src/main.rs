@@ -35,71 +35,70 @@ fn main() {
         }
 
         if command == "echo" {
-            let mut cleaned_args = Vec::new();
-            let mut stdout_redirect: Option<File> = None;
+    let mut cleaned_args = Vec::new();
+    let mut stdout_redirect: Option<File> = None;
+    let mut args = parts[1..].to_vec();  // Convert to Vec here
 
-            let mut i = 0;
-            while i < args.len() {
-                if args[i] == ">" || args[i] == "1>" {
-                    if i + 1 < args.len() {
-                        match File::create(&args[i + 1]) {
-                            Ok(file) => {
-                                stdout_redirect = Some(file);
-                                i += 2;
-                                continue;
-                            }
-                            Err(e) => {
-                                eprintln!("{}: {}", args[i + 1], e);
-                                break;
-                            }
-                        }
-                    } else {
-                        eprintln!("{}: missing filename", args[i]);
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == ">" || args[i] == "1>" {
+            if i + 1 < args.len() {
+                match File::create(&args[i + 1]) {
+                    Ok(file) => {
+                        stdout_redirect = Some(file);
+                        args.drain(i..=i + 1);
+                        continue;
+                    }
+                    Err(e) => {
+                        eprintln!("{}: {}", args[i + 1], e);
                         break;
                     }
-                } else if args[i] == ">>" || args[i] == "1>>" {
-
-                    if i + 1 < args.len() {
-                        let filename = args[i + 1].clone();
-                        if let Some(parent) = Path::new(&filename).parent() {
-                            let _ = std::fs::create_dir_all(parent);
-                        }
-                        match OpenOptions::new()
-                            .append(true)
-                            .create(true)
-                            .open(&filename) 
-                        {
-                            Ok(file) => {
-                                stdout_redirect = Some(file);
-                                args.drain(i..=i+1);
-                                continue;
-                            }
-                            Err(e) => {
-                                eprintln!("{}: {}", filename, e);
-                                break;
-                            } 
-                        }
-                    } else {
-                        eprintln!("{}: missing filename", args[i]);
-                        break;
-                    }
-                }
-
-                cleaned_args.push(args[i].clone());
-                i += 1;
-            }
-
-            let output = cleaned_args.join(" ");
-            if let Some(mut file) = stdout_redirect {
-                if let Err(e) = writeln!(file, "{}", output) {
-                    eprintln!("echo: failed to write to file: {}", e);
                 }
             } else {
-                println!("{}", output);
+                eprintln!("{}: missing filename", args[i]);
+                break;
             }
-            continue;
+        } else if args[i] == ">>" || args[i] == "1>>" {
+            if i + 1 < args.len() {
+                let filename = &args[i + 1];
+                if let Some(parent) = Path::new(filename).parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                match OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open(filename) 
+                {
+                    Ok(file) => {
+                        stdout_redirect = Some(file);
+                        args.drain(i..=i + 1);
+                        continue;
+                    }
+                    Err(e) => {
+                        eprintln!("{}: {}", filename, e);
+                        break;
+                    }
+                }
+            } else {
+                eprintln!("{}: missing filename", args[i]);
+                break;
+            }
         }
 
+        cleaned_args.push(args[i].clone());
+        i += 1;
+    }
+
+    let output = cleaned_args.join(" ");
+    if let Some(mut file) = stdout_redirect {
+        if let Err(e) = writeln!(file, "{}", output) {
+            eprintln!("echo: failed to write to file: {}", e);
+        }
+    } else {
+        println!("{}", output);
+    }
+    continue;
+}
         if command == "type" {
             if let Some(arg) = args.first() {
                 if ["echo", "exit", "type", "pwd", "cd"].contains(&arg.as_str()) {
@@ -178,8 +177,8 @@ fn main() {
 
         // External command
         if let Ok(path_var) = std::env::var("PATH") {
-            let (mut args_vec, stderr_redirect) =
-                parse_command_with_stderr_redirection(parts.clone());
+            let mut args_vec = parts[1..].to_vec();
+            let stderr_redirect = parse_stderr_redirection(&mut args_vec);
             let mut stdout_redirect: Option<File> = None;
 
             // Clone early to avoid borrowing conflict
@@ -347,21 +346,20 @@ fn tokenize(input: &str) -> Vec<String> {
     tokens
 }
 
-fn parse_command_with_stderr_redirection(parts: Vec<String>) -> (Vec<String>, Option<String>) {
-    let mut cmd_parts = Vec::new();
+fn parse_stderr_redirection(args: &mut Vec<String>) -> Option<String> {
     let mut stderr_file = None;
-
-    let mut iter = parts.into_iter().peekable();
-    while let Some(part) = iter.next() {
-        if part == "2>" {
-            if let Some(file) = iter.next() {
-                stderr_file = Some(file);
+    let mut i = 0;
+    
+    while i < args.len() {
+        if args[i] == "2>" {
+            if i + 1 < args.len() {
+                stderr_file = Some(args[i + 1].clone());
+                args.drain(i..=i + 1);
+                continue;
             }
-        } else {
-            cmd_parts.push(part);
         }
+        i += 1;
     }
-
-    (cmd_parts, stderr_file)
+    
+    stderr_file
 }
-
