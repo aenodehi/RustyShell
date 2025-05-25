@@ -557,88 +557,84 @@ fn run_builtin(
 }
 
 
-fn handle_pipeline(cmd_line: &str) {
-    let stages: Vec<&str> = cmd_line.split('|').map(str::trim).collect();
-    let num_cmds = stages.len();
-
-    if num_cmds < 2 {
-        eprintln!("Pipeline must contain at least two commands.");
+fn handle_pipeline(cmd: &str) {
+    let parts: Vec<&str> = cmd.split('|').map(str::trim).collect();
+    if parts.len() != 2 {
+        eprintln!("Only single pipelines supported");
         return;
     }
 
-    let mut pipes = Vec::with_capacity(num_cmds - 1);
+    // Parse and prepare left command
+    let left_cmd_strs: Vec<String> = parts[0].split_whitespace().map(|s| s.to_string()).collect();
+    let left_cmd: Vec<CString> = left_cmd_strs.iter().map(|s| CString::new(s.as_str()).unwrap()).collect();
 
-    // Create all needed pipes
-    for _ in 0..(num_cmds - 1) {
-        match pipe() {
-            Ok((r, w)) => pipes.push((r, w)),
-            Err(err) => {
-                eprintln!("pipe failed: {}", err);
-                return;
+    // Parse and prepare right command
+    let right_cmd_strs: Vec<String> = parts[1].split_whitespace().map(|s| s.to_string()).collect();
+    let right_cmd: Vec<CString> = right_cmd_strs.iter().map(|s| CString::new(s.as_str()).unwrap()).collect();
+
+    let (read_end, write_end) = {
+        let (r, w) = pipe().expect("pipe failed");
+        (r.into_raw_fd(), w.into_raw_fd())
+    };
+
+    match unsafe { fork() } {
+        Ok(ForkResult::Child) => {
+            // First child handles left side of pipeline
+            unsafe {
+                if libc::dup2(write_end, libc::STDOUT_FILENO) == -1 {
+                    panic!("dup2 failed");
+                }
+                libc::signal(libc::SIGPIPE, libc::SIG_DFL);
             }
+            
+            close(read_end).ok();
+            close(write_end).ok();
+
+            let cmd = &left_cmd_strs[0];
+            let args: Vec<&str> = left_cmd_strs[1..].iter().map(|s| s.as_str()).collect();
+
+            if is_builtin(cmd) {
+                run_builtin(cmd, &args, None, None);
+                process::exit(0);
+            }
+
+            execvp(&left_cmd[0], &left_cmd).expect("execvp failed for left command");
         }
-    }
+        Ok(ForkResult::Parent { .. }) => {
+            match unsafe { fork() } {
+                Ok(ForkResult::Child) => {
+                    // Second child handles right side of pipeline
+                    unsafe {
+                        if libc::dup2(read_end, libc::STDIN_FILENO) == -1 {
+                            panic!("dup2 failed");
+                        }
+                        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+                    }
 
-    for i in 0..num_cmds {
-        let stage = stages[i].trim();
-        let parts: Vec<String> = tokenize(stage);
-        let cmd = parts.get(0).map(String::as_str);
-        let args: Vec<String> = parts.iter().skip(1).cloned().collect();
+                    close(read_end).ok();
+                    close(write_end).ok();
 
-        match unsafe { fork() } {
-            Ok(ForkResult::Child) => {
-                // Input redirection for intermediate or last commands
-                if i > 0 {
-                    let (prev_read, _) = pipes[i - 1];
-                    unsafe { libc::dup2(prev_read, libc::STDIN_FILENO) };
-                }
+                    let cmd = &right_cmd_strs[0];
+                    let args: Vec<&str> = right_cmd_strs[1..].iter().map(|s| s.as_str()).collect();
 
-                // Output redirection for intermediate or first commands
-                if i < num_cmds - 1 {
-                    let (_, next_write) = pipes[i];
-                    unsafe { libc::dup2(next_write, libc::STDOUT_FILENO) };
-                }
-
-                // Close all pipe fds in child
-                for (read_fd, write_fd) in &pipes {
-                    let _ = close(*read_fd);
-                    let _ = close(*write_fd);
-                }
-
-                if let Some(command) = cmd {
-                    if is_builtin(command) {
-                        let arg_refs: Vec<&str> = args.iter().map(AsRef::as_ref).collect();
-                        run_builtin(command, &arg_refs, None, None);
+                    if is_builtin(cmd) {
+                        run_builtin(cmd, &args, None, None);
                         process::exit(0);
                     }
 
-                    let cstrs: Vec<CString> = parts.iter()
-                        .map(|s| CString::new(s.as_str()).unwrap())
-                        .collect();
-
-                    execvp(&cstrs[0], &cstrs).expect("execvp failed");
+                    execvp(&right_cmd[0], &right_cmd).expect("execvp failed for right command");
                 }
-                process::exit(1);
-            }
-            Ok(ForkResult::Parent { .. }) => {
-                // Parent continues loop
-            }
-            Err(e) => {
-                eprintln!("fork failed: {}", e);
-                return;
+                Ok(ForkResult::Parent { .. }) => {
+                    // Parent closes and waits
+                    close(read_end).ok();
+                    close(write_end).ok();
+                    waitpid(None, None).ok();
+                    waitpid(None, None).ok();
+                }
+                Err(_) => eprintln!("Failed to fork second child"),
             }
         }
-    }
-
-    // Parent closes all pipe ends
-    for (read_fd, write_fd) in pipes {
-        let _ = close(read_fd);
-        let _ = close(write_fd);
-    }
-
-    // Wait for all child processes
-    for _ in 0..num_cmds {
-        let _ = waitpid(None, None);
+        Err(_) => eprintln!("Failed to fork first child"),
     }
 }
 
