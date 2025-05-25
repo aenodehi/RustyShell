@@ -43,14 +43,42 @@ fn main() {
                 if args[i] == ">" || args[i] == "1>" {
                     if i + 1 < args.len() {
                         match File::create(&args[i + 1]) {
-                            Ok(file) => stdout_redirect = Some(file),
+                            Ok(file) => {
+                                stdout_redirect = Some(file);
+                                i += 2;
+                                continue;
+                            }
                             Err(e) => {
                                 eprintln!("{}: {}", args[i + 1], e);
                                 break;
                             }
                         }
-                        i += 2;
-                        continue;
+                    } else {
+                        eprintln!("{}: missing filename", args[i]);
+                        break;
+                    }
+                } else if args[i] == ">>" || args[i] == "1>>" {
+
+                    if i + 1 < args.len() {
+                        let filename = args[i + 1].clone();
+                        if let Some(parent) = Path::new(&filename).parent() {
+                            let _ = std::fs::create_dir_all(parent);
+                        }
+                        match OpenOptions::new()
+                            .append(true)
+                            .create(true)
+                            .open(&filename) 
+                        {
+                            Ok(file) => {
+                                stdout_redirect = Some(file);
+                                args.drain(i..=i+1);
+                                continue;
+                            }
+                            Err(e) => {
+                                eprintln!("{}: {}", filename, e);
+                                break;
+                            } 
+                        }
                     } else {
                         eprintln!("{}: missing filename", args[i]);
                         break;
