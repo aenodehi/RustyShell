@@ -102,7 +102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Err(_) => continue,
         };
 
-        let _ = rl.add_history_entry(line.as_str());
+        //let _ = rl.add_history_entry(line.as_str());
 
         let trimmed = input.trim();
         let parts = tokenize(trimmed);
