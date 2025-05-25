@@ -580,7 +580,12 @@ fn handle_pipeline(cmd: &str) {
     match unsafe { fork() } {
         Ok(ForkResult::Child) => {
             // First child handles left side of pipeline
-            dup2(write_end, libc::STDOUT_FILENO).expect("dup2 failed");
+            unsafe {
+                if libc::dup2(write_end, libc::STDOUT_FILENO) == -1 {
+                    panic!("dup2 failed");
+                }
+            }
+            
             close(read_end).ok();
             close(write_end).ok();
 
