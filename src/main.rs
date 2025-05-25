@@ -196,6 +196,7 @@ fn main() {
 
                     let mut cmd = Command::new(full_path);
                     cmd.args(&args_vec[1..]);
+                    cmd.env("ARGV0", command);
 
                     if let Some(ref file) = stdout_redirect {
                         cmd.stdout(Stdio::from(file.try_clone().unwrap()));
