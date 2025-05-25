@@ -482,7 +482,7 @@ fn handle_pipeline(cmd: &str) {
     match unsafe { fork() } {
         Ok(ForkResult::Child) => {
             // First command: set stdout to write end of pipe
-            dup2(write_end, libc::STDOUT_FILENO).expect("dup2 failed");
+            dup2(write_end, 1).expect("dup2 failed");
             close(read_end).ok();
             close(write_end).ok();
             execvp(&left_cmd[0], &left_cmd).expect("execvp failed");
@@ -491,7 +491,7 @@ fn handle_pipeline(cmd: &str) {
             match unsafe { fork() } {
                 Ok(ForkResult::Child) => {
                     // Second command: set stdin to read end of pipe
-                    dup2(read_end, libc::STDIN_FILENO).expect("dup2 failed");
+                    dup2(read_end, 0).expect("dup2 failed");
                     close(read_end).ok();
                     close(write_end).ok();
                     execvp(&right_cmd[0], &right_cmd).expect("execvp failed");
