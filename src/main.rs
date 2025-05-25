@@ -19,6 +19,7 @@ use nix::sys::wait::waitpid;
 use nix::unistd::{close, dup2, execvp, fork, pipe, ForkResult};
 use std::ffi::CString;
 use std::os::unix::io::RawFd;
+use std::os::fd::IntoRawFd;
 use libc;
 
 struct ShellCompleter;
