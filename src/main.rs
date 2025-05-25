@@ -44,6 +44,17 @@ impl Completer for ShellCompleter {
         let prefix = &line[..pos];
         let mut completions = vec![];
 
+
+        let builtins = ["exit", "echo", "cd", "pwd", "type"];
+        for &builtin in &builtins {
+            if builtin.starts_with(prefix) {
+                completions.push(Pair {
+                    display: builtin.to_string(),
+                    replacement: format!("{} ", builtin),
+                });
+            }
+        }
+
         if let Ok(paths) = env::var("PATH") {
             for dir in paths.split(':') {
                 if let Ok(entries) = fs::read_dir(dir) {
