@@ -20,7 +20,7 @@ use nix::unistd::{close, execvp, fork, pipe, ForkResult};
 //use nix::unistd::dup2;
 use std::ffi::CString;
 //use std::os::unix::io::RawFd;
-use std::os::fd::IntoRawFd;
+//use std::os::fd::IntoRawFd;
 use libc;
 use std::os::unix::io::AsRawFd;
 
