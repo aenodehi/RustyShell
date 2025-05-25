@@ -264,7 +264,7 @@ fn run_external(mut tokens: Vec<String>) -> Result<(), Box<dyn std::error::Error
                 cmd.args(&tokens[1..]);
 
                 if let Some(ref out) = stdout_redirect {
-                    cmd.stdout(Stdio::from(out));
+                    cmd.stdout(Stdio::from(out.try_clone()?));
                 }
 
                 if let Some(ref err) = stderr_redirect {
