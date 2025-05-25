@@ -284,7 +284,7 @@ fn run_external(mut tokens: Vec<String>) -> Result<(), Box<dyn std::error::Error
                         eprintln!("Failed to execute {}: {}", command, e);
                     }
                 }
-                return;
+                return Ok(());
             }
         }
     }
