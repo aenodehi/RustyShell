@@ -467,6 +467,94 @@ fn check_executable(path: &Path, arg: &str) -> bool {
     }
 }
 
+fn is_builtin(cmd: &str) -> bool {
+    matches!(cmd, "cd" | "pwd" | "echo" | "exit" | "type")
+}
+
+fn run_builtin(
+    cmd: &str,
+    args: &[&str],
+    stdout_redirect: Option<&mut File>,
+    stderr_redirect: Option<&mut File>,
+) {
+    match cmd {
+        "echo" => {
+            let output = args.join(" ");
+            if let Some(out) = stdout_redirect {
+                let _ = writeln!(out, "{}", output);
+            } else {
+                println!("{}", output);
+            }
+        }
+        "pwd" => {
+            match env::current_dir() {
+                Ok(path) => {
+                    if let Some(out) = stdout_redirect {
+                        let _ = writeln!(out, "{}", path.display());
+                    } else {
+                        println!("{}", path.display());
+                    }
+                }
+                Err(err) => {
+                    if let Some(err_file) = stderr_redirect {
+                        let _ = writeln!(err_file, "pwd: {}", err);
+                    } else {
+                        eprintln!("pwd: {}", err);
+                    }
+                }
+            }
+        }
+        "cd" => {
+            let target = args.get(0).map(|s| *s).unwrap_or("");
+            let target_dir = if target == "~" {
+                env::var("HOME").unwrap_or_else(|_| ".".into())
+            } else {
+                target.to_string()
+            };
+            if let Err(err) = env::set_current_dir(&target_dir) {
+                if let Some(err_file) = stderr_redirect {
+                    let _ = writeln!(err_file, "cd: {}: {}", target_dir, err);
+                } else {
+                    eprintln!("cd: {}: {}", target_dir, err);
+                }
+            }
+        }
+        "exit" => {
+            process::exit(0);
+        }
+        "type" => {
+            if let Some(arg) = args.first() {
+                if is_builtin(arg) {
+                    println!("{} is a shell builtin", arg);
+                } else {
+                    let mut found = false;
+                    if let Ok(path_var) = env::var("PATH") {
+                        found = path_var.split(':').any(|dir| {
+                            let full_path = Path::new(dir).join(arg);
+                            full_path.exists() && full_path.is_file()
+                                && full_path.metadata().map(|m| m.permissions().mode() & 0o111 != 0).unwrap_or(false)
+                        });
+                    }
+
+                    if found {
+                        println!("{} is a binary in PATH", arg);
+                    } else {
+                        println!("{}: not found", arg);
+                    }
+                }
+            } else {
+                println!("type: missing argument");
+            }
+        }
+        _ => {
+            if let Some(err_file) = stderr_redirect {
+                let _ = writeln!(err_file, "{}: builtin not implemented", cmd);
+            } else {
+                eprintln!("{}: builtin not implemented", cmd);
+            }
+        }
+    }
+}
 
 
 fn handle_pipeline(cmd: &str) {
