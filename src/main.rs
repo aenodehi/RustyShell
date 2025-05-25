@@ -589,7 +589,7 @@ fn handle_pipeline(cmd_line: &str) {
             Ok(ForkResult::Child) => {
                 // Input redirection for intermediate or last commands
                 if i > 0 {
-                    let (prev_read, _) = pipes[i - 1];
+                    let (prev_read, _) = &pipes[i - 1];
                     unsafe { libc::dup2(prev_read.as_raw_fd(), libc::STDIN_FILENO) };
                 }
 
