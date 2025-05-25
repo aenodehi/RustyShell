@@ -583,6 +583,7 @@ fn handle_pipeline(cmd: &str) {
                 if libc::dup2(write_end, libc::STDOUT_FILENO) == -1 {
                     panic!("dup2 failed");
                 }
+                libc::signal(libc::SIGPIPE, libc::SIG_DFL);
             }
             
             close(read_end).ok();
@@ -606,6 +607,7 @@ fn handle_pipeline(cmd: &str) {
                         if libc::dup2(read_end, libc::STDIN_FILENO) == -1 {
                             panic!("dup2 failed");
                         }
+                        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
                     }
 
                     close(read_end).ok();
