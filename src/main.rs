@@ -54,7 +54,7 @@ impl Completer for ShellCompleter {
                                     if name.starts_with(prefix) {
                                         completions.push(Pair {
                                             display: name.to_string(),
-                                            replacement: name.to_string(),
+                                            replacement: format!("{} ", name),
                                         });
                                     }
                                 }
