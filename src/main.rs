@@ -192,7 +192,7 @@ fn main() {
         if let Ok(path_var) = std::env::var("PATH") {
             let mut args_vec = parts.clone();
             let stderr_redirect = parse_stderr_redirection(&mut args_vec);
-            let mut stdout_redirect: Option<File> = None;
+            let stdout_redirect: Option<File> = None;
             
 
             // Clone early to avoid borrowing conflict
@@ -203,7 +203,7 @@ fn main() {
             };
 
             let mut stdout_redirect: Option<File> = None;
-            let mut append_mode = false;
+            let append_mode = false;
 
             let mut i = 0;
             while i < args_vec.len() {
