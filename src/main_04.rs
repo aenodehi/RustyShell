@@ -22,8 +22,6 @@ use std::os::unix::io::RawFd;
 use std::os::fd::IntoRawFd;
 use libc;
 
-use std::process;
-
 struct ShellCompleter;
 
 impl Hinter for ShellCompleter {
@@ -476,65 +474,56 @@ fn handle_pipeline(cmd: &str) {
         return;
     }
 
-    // Parse and prepare left command
-    let left_cmd_strs: Vec<String> = parts[0].split_whitespace().map(|s| s.to_string()).collect();
-    let left_cmd: Vec<CString> = left_cmd_strs.iter().map(|s| CString::new(s.as_str()).unwrap()).collect();
+    let left_cmd: Vec<CString> = parts[0]
+        .split_whitespace()
+        .map(|s| CString::new(s).unwrap())
+        .collect();
+    let right_cmd: Vec<CString> = parts[1]
+        .split_whitespace()
+        .map(|s| CString::new(s).unwrap())
+        .collect();
 
-    // Parse and prepare right command
-    let right_cmd_strs: Vec<String> = parts[1].split_whitespace().map(|s| s.to_string()).collect();
-    let right_cmd: Vec<CString> = right_cmd_strs.iter().map(|s| CString::new(s.as_str()).unwrap()).collect();
-
-    let (read_end, write_end) = {
+    let (read_end, write_end): (RawFd, RawFd) = {
         let (r, w) = pipe().expect("pipe failed");
         (r.into_raw_fd(), w.into_raw_fd())
     };
 
     match unsafe { fork() } {
         Ok(ForkResult::Child) => {
-            // First child handles left side of pipeline
-            dup2(write_end, libc::STDOUT_FILENO).expect("dup2 failed");
+            // First child: execute left side of pipe
+            unsafe {
+                libc::dup2(write_end, libc::STDOUT_FILENO);
+            }
             close(read_end).ok();
             close(write_end).ok();
-
-            let cmd = &left_cmd_strs[0];
-            let args: Vec<&str> = left_cmd_strs[1..].iter().map(|s| s.as_str()).collect();
-
-            if is_builtin(cmd) {
-                run_builtin(cmd, &args, None, None);
-                process::exit(0);
-            }
-
             execvp(&left_cmd[0], &left_cmd).expect("execvp failed for left command");
         }
         Ok(ForkResult::Parent { .. }) => {
             match unsafe { fork() } {
                 Ok(ForkResult::Child) => {
-                    // Second child handles right side of pipeline
-                    dup2(read_end, libc::STDIN_FILENO).expect("dup2 failed");
+                    // Second child: execute right side of pipe
+                    unsafe {
+                        libc::dup2(read_end, libc::STDIN_FILENO);
+                    }
                     close(read_end).ok();
                     close(write_end).ok();
-
-                    let cmd = &right_cmd_strs[0];
-                    let args: Vec<&str> = right_cmd_strs[1..].iter().map(|s| s.as_str()).collect();
-
-                    if is_builtin(cmd) {
-                        run_builtin(cmd, &args, None, None);
-                        process::exit(0);
-                    }
-
                     execvp(&right_cmd[0], &right_cmd).expect("execvp failed for right command");
                 }
                 Ok(ForkResult::Parent { .. }) => {
-                    // Parent closes and waits
+                    // Parent process
                     close(read_end).ok();
                     close(write_end).ok();
                     waitpid(None, None).ok();
                     waitpid(None, None).ok();
                 }
-                Err(_) => eprintln!("Failed to fork second child"),
+                Err(_) => {
+                    eprintln!("Failed to fork second child");
+                }
             }
         }
-        Err(_) => eprintln!("Failed to fork first child"),
+        Err(_) => {
+            eprintln!("Failed to fork first child");
+        }
     }
 }
 
