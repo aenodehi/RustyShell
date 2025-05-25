@@ -11,6 +11,7 @@ use rustyline::{Editor, Helper, Context, Config, CompletionType};
 use rustyline::highlight::Highlighter;
 use rustyline::hint::{Hinter, Hint};
 use rustyline::validate::{Validator, ValidationResult, ValidationContext};
+use rustyline::history::FileHistory;
 
 struct ShellCompleter;
 
@@ -88,9 +89,9 @@ fn main() {
         .completion_type(CompletionType::List)
         .build();
 
-    let mut rl = Editor::with_config(config);
+    let mut rl = Editor::<_, FileHistory>::with_config(config).unwrap();    
     let completer = ShellCompleter;
-    rl.set_helper(Some(completer));
+    rl.set_helper(Some(Shellcompleter));
 
     loop {
         let readline = rl.readline("$ ");
@@ -105,6 +106,9 @@ fn main() {
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
             Err(_) => continue,
         };
+
+        let line = rl.readline("$ ")?;
+        let _ = rl.add_history_entry(line.as_str());
 
         let trimmed = input.trim();
         let parts = tokenize(trimmed);
