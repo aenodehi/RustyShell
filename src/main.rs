@@ -15,11 +15,12 @@ use rustyline::hint::Hinter;
 use rustyline::validate::{Validator, ValidationResult, ValidationContext};
 use rustyline::history::FileHistory;
 
-use std::os::fd::RawFd;
 use nix::sys::wait::waitpid;
 use nix::unistd::{close, dup2, execvp, fork, pipe};
 use nix::unistd::ForkResult;
 use std::ffi::CString;
+use std::os::unix::io::IntoRawFd;
+use std::os::unix::io::{RawFd, IntoRawFd};
 
 struct ShellCompleter;
 
@@ -479,7 +480,11 @@ fn handle_pipeline(cmd: &str) {
         .map(|s| CString::new(s).unwrap())
         .collect();
 
-    let (read_end, write_end): (RawFd, RawFd) = pipe().expect("pipe failed");
+    //let (read_end, write_end): (RawFd, RawFd) = pipe().expect("pipe failed");
+    let (read_end, write_end) = {
+        let (r, w) = pipe().expect("pipe failed");
+        (r.into_raw_fd(), w.into_raw_fd())
+    };
 
     match unsafe { fork() } {
         Ok(ForkResult::Child) => {
