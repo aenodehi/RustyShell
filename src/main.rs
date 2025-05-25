@@ -19,6 +19,7 @@ use std::os::fd::RawFd;
 use nix::sys::wait::waitpid;
 use nix::unistd::{close, dup2, execvp, fork, pipe};
 use nix::unistd::ForkResult;
+use std::ffi::CString;
 
 struct ShellCompleter;
 
@@ -469,11 +470,11 @@ fn handle_pipeline(cmd: &str) {
         return;
     }
 
-    let left_cmd: Vec<CString> = parts[0]
+    let left_cmd: Vec<String> = parts[0]
         .split_whitespace()
         .map(|s| CString::new(s).unwrap())
         .collect();
-    let right_cmd: Vec<CString> = parts[1]
+    let right_cmd: Vec<String> = parts[1]
         .split_whitespace()
         .map(|s| CString::new(s).unwrap())
         .collect();
