@@ -31,7 +31,7 @@
 Clone the repository and build with Cargo:
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/aenodehi/RustyShell.git
 cd rusty-shell
 cargo build --release
 ```
